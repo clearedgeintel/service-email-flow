@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "workers": "tsx --tsconfig tsconfig.json src/workers/index.ts",
+    "workers:dev": "tsx watch --tsconfig tsconfig.json src/workers/index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.1",
