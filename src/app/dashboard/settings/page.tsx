@@ -1,0 +1,292 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Save, Plus, Trash2, Check } from 'lucide-react';
+
+interface PricingItem {
+  id: number;
+  trade: string;
+  service: string;
+  keywords: string[];
+  price_min: number;
+  price_max: number;
+  unit: string;
+  active: boolean;
+}
+
+const SETTING_GROUPS = [
+  {
+    title: 'Business Information',
+    fields: [
+      { key: 'business_name', label: 'Business Name', type: 'text' },
+      { key: 'business_phone', label: 'Phone Number', type: 'text' },
+      { key: 'business_url', label: 'Website URL', type: 'text' },
+      { key: 'business_location', label: 'Location', type: 'text' },
+      { key: 'owner_email', label: 'Owner Email', type: 'email' },
+    ],
+  },
+  {
+    title: 'Technician Contact',
+    fields: [
+      { key: 'tech_email', label: 'Tech Email', type: 'email' },
+      { key: 'tech_phone', label: 'Tech Phone', type: 'text' },
+      { key: 'twilio_from_number', label: 'Twilio From Number', type: 'text' },
+    ],
+  },
+  {
+    title: 'Booking Links',
+    fields: [
+      { key: 'calcom_emergency_url', label: 'Emergency Booking URL', type: 'url' },
+      { key: 'calcom_service_url', label: 'Service Call Booking URL', type: 'url' },
+      { key: 'calcom_estimate_url', label: 'Free Estimate Booking URL', type: 'url' },
+    ],
+  },
+  {
+    title: 'Automation Settings',
+    fields: [
+      { key: 'confidence_threshold', label: 'Confidence Threshold (0-1)', type: 'number' },
+      { key: 'followup_delay_1_hours', label: 'First Follow-up Delay (hours)', type: 'number' },
+      { key: 'followup_delay_2_hours', label: 'Second Follow-up Delay (hours)', type: 'number' },
+      { key: 'max_followups', label: 'Max Follow-ups', type: 'number' },
+      { key: 'slack_webhook_url', label: 'Slack Webhook URL', type: 'url' },
+    ],
+  },
+];
+
+export default function SettingsPage() {
+  const router = useRouter();
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [pricing, setPricing] = useState<PricingItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [tab, setTab] = useState<'config' | 'pricing'>('config');
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/settings').then((r) => {
+        if (r.status === 401) { router.push('/login'); return null; }
+        return r.json();
+      }),
+      fetch('/api/pricing').then((r) => r.json()),
+    ]).then(([settingsData, pricingData]) => {
+      if (settingsData) {
+        // Flatten JSONB values
+        const flat: Record<string, string> = {};
+        for (const [k, v] of Object.entries(settingsData.settings || {})) {
+          flat[k] = typeof v === 'string' ? v : JSON.stringify(v);
+        }
+        setSettings(flat);
+      }
+      setPricing(pricingData?.items || []);
+      setLoading(false);
+    });
+  }, [router]);
+
+  const saveSettings = async () => {
+    setSaving(true);
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(settings)) {
+      // Try to parse numbers
+      const num = parseFloat(v);
+      body[k] = !isNaN(num) && SETTING_GROUPS.some(g => g.fields.some(f => f.key === k && f.type === 'number'))
+        ? num
+        : v;
+    }
+
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const deletePricingItem = async (id: number) => {
+    await fetch(`/api/pricing/${id}`, { method: 'DELETE' });
+    setPricing(pricing.filter((p) => p.id !== id));
+  };
+
+  const [newItem, setNewItem] = useState({ trade: 'electric', service: '', keywords: '', price_min: '', price_max: '', unit: 'per job' });
+  const [addingPricing, setAddingPricing] = useState(false);
+
+  const addPricingItem = async () => {
+    if (!newItem.service || !newItem.keywords || !newItem.price_min || !newItem.price_max) return;
+    setAddingPricing(true);
+    const res = await fetch('/api/pricing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...newItem,
+        keywords: newItem.keywords.split(',').map((k) => k.trim()),
+        price_min: parseFloat(newItem.price_min),
+        price_max: parseFloat(newItem.price_max),
+      }),
+    });
+    const data = await res.json();
+    if (data.item) {
+      setPricing([...pricing, data.item]);
+      setNewItem({ trade: 'electric', service: '', keywords: '', price_min: '', price_max: '', unit: 'per job' });
+    }
+    setAddingPricing(false);
+  };
+
+  if (loading) {
+    return <div className="p-6 text-gray-400">Loading settings...</div>;
+  }
+
+  return (
+    <div className="p-6 max-w-4xl">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setTab('config')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'config' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Configuration
+        </button>
+        <button
+          onClick={() => setTab('pricing')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'pricing' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Pricing Table
+        </button>
+      </div>
+
+      {tab === 'config' && (
+        <div className="space-y-6">
+          {SETTING_GROUPS.map((group) => (
+            <div key={group.title} className="bg-white border border-gray-200 rounded-xl p-5">
+              <h2 className="font-semibold text-gray-900 mb-4">{group.title}</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {group.fields.map((field) => (
+                  <div key={field.key}>
+                    <label className="block text-sm font-medium text-gray-600 mb-1">{field.label}</label>
+                    <input
+                      type={field.type}
+                      value={settings[field.key] || ''}
+                      onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      step={field.type === 'number' ? '0.01' : undefined}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <button
+            onClick={saveSettings}
+            disabled={saving}
+            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      )}
+
+      {tab === 'pricing' && (
+        <div className="space-y-6">
+          {/* Pricing Table */}
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Trade</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Service</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Keywords</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Min</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Max</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Unit</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pricing.filter(p => p.active).map((item) => (
+                  <tr key={item.id} className="border-b border-gray-100">
+                    <td className="px-4 py-2.5 capitalize">{item.trade}</td>
+                    <td className="px-4 py-2.5 font-medium">{item.service}</td>
+                    <td className="px-4 py-2.5 text-gray-500 max-w-xs truncate">{item.keywords.join(', ')}</td>
+                    <td className="px-4 py-2.5 text-right">${item.price_min}</td>
+                    <td className="px-4 py-2.5 text-right">${item.price_max}</td>
+                    <td className="px-4 py-2.5">{item.unit}</td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => deletePricingItem(item.id)}
+                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Add New Item */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="font-semibold text-gray-900 mb-3">Add Pricing Item</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <select
+                value={newItem.trade}
+                onChange={(e) => setNewItem({ ...newItem, trade: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="electric">Electric</option>
+                <option value="plumbing">Plumbing</option>
+              </select>
+              <input
+                placeholder="Service name"
+                value={newItem.service}
+                onChange={(e) => setNewItem({ ...newItem, service: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm col-span-2"
+              />
+              <input
+                placeholder="Keywords (comma-separated)"
+                value={newItem.keywords}
+                onChange={(e) => setNewItem({ ...newItem, keywords: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm col-span-3 sm:col-span-3"
+              />
+              <input
+                type="number"
+                placeholder="Min $"
+                value={newItem.price_min}
+                onChange={(e) => setNewItem({ ...newItem, price_min: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <input
+                type="number"
+                placeholder="Max $"
+                value={newItem.price_max}
+                onChange={(e) => setNewItem({ ...newItem, price_max: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+              <input
+                placeholder="Unit (e.g. per job)"
+                value={newItem.unit}
+                onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              />
+            </div>
+            <button
+              onClick={addPricingItem}
+              disabled={addingPricing}
+              className="mt-3 flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-900 disabled:opacity-50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              {addingPricing ? 'Adding...' : 'Add Item'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
