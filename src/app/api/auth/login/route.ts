@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionId = await createSession();
-    setSessionCookie(sessionId);
+    await setSessionCookie(sessionId);
 
     return NextResponse.json({ success: true });
   } catch {

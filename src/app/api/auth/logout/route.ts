@@ -11,7 +11,7 @@ export async function POST() {
       await destroySession(sessionId);
     }
 
-    clearSessionCookie();
+    await clearSessionCookie();
 
     return NextResponse.json({ success: true });
   } catch {

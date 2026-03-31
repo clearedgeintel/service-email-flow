@@ -37,9 +37,9 @@ export async function validateSession(sessionId: string): Promise<boolean> {
   return true;
 }
 
-export function setSessionCookie(sessionId: string): void {
-  const cookieStore = cookies();
-  (cookieStore as any).set(SESSION_COOKIE, sessionId, { // eslint-disable-line @typescript-eslint/no-explicit-any
+export async function setSessionCookie(sessionId: string): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE, sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -48,9 +48,9 @@ export function setSessionCookie(sessionId: string): void {
   });
 }
 
-export function clearSessionCookie(): void {
-  const cookieStore = cookies();
-  (cookieStore as any).set(SESSION_COOKIE, '', { // eslint-disable-line @typescript-eslint/no-explicit-any
+export async function clearSessionCookie(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE, '', {
     httpOnly: true,
     path: '/',
     maxAge: 0,
