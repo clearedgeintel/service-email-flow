@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
+import { PricingCreateSchema } from '@/lib/validation';
 
 export async function GET() {
   const authError = await requireAuth();
@@ -25,11 +26,16 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   const body = await request.json();
-  const { trade, service, keywords, price_min, price_max, unit } = body;
+  const parsed = PricingCreateSchema.safeParse(body);
 
-  if (!trade || !service || !keywords || !price_min || !price_max) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    );
   }
+
+  const { trade, service, keywords, price_min, price_max, unit } = parsed.data;
 
   const supabase = getSupabase();
   const { data, error } = await supabase
@@ -37,10 +43,10 @@ export async function POST(request: NextRequest) {
     .insert({
       trade,
       service,
-      keywords: Array.isArray(keywords) ? keywords : keywords.split(',').map((k: string) => k.trim()),
+      keywords: Array.isArray(keywords) ? keywords : [keywords],
       price_min,
       price_max,
-      unit: unit || 'per job',
+      unit,
       active: true,
     })
     .select()

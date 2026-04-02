@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
 import { invalidateConfigCache } from '@/lib/config';
+import { SettingsUpdateSchema } from '@/lib/validation';
 
 export async function GET() {
   const authError = await requireAuth();
@@ -31,12 +32,17 @@ export async function PUT(request: NextRequest) {
   if (authError) return authError;
 
   const body = await request.json();
-  const supabase = getSupabase();
+  const parsed = SettingsUpdateSchema.safeParse(body);
 
-  const entries = Object.entries(body);
-  if (entries.length === 0) {
-    return NextResponse.json({ error: 'No settings provided' }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    );
   }
+
+  const supabase = getSupabase();
+  const entries = Object.entries(parsed.data);
 
   for (const [key, value] of entries) {
     await supabase

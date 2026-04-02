@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
+import { CaseQuerySchema } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   const authError = await requireAuth();
   if (authError) return authError;
 
-  const params = request.nextUrl.searchParams;
-  const status = params.get('status');
-  const intent = params.get('intent');
-  const urgency = params.get('urgency');
-  const trade = params.get('trade');
-  const from = params.get('from');
-  const to = params.get('to');
-  const search = params.get('search');
-  const page = parseInt(params.get('page') || '1');
-  const limit = Math.min(parseInt(params.get('limit') || '25'), 100);
-  const sort = params.get('sort') || 'received_at';
-  const order = params.get('order') === 'asc' ? true : false;
+  const raw = Object.fromEntries(request.nextUrl.searchParams.entries());
+  const parsed = CaseQuerySchema.safeParse(raw);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    );
+  }
+
+  const { status, intent, urgency, trade, from, to, search, page, limit, sort, order } = parsed.data;
 
   const supabase = getSupabase();
   let query = supabase
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   }
 
   const offset = (page - 1) * limit;
-  query = query.order(sort, { ascending: order }).range(offset, offset + limit - 1);
+  query = query.order(sort, { ascending: order === 'asc' }).range(offset, offset + limit - 1);
 
   const { data, error, count } = await query;
 

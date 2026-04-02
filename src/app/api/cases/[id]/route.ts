@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
 import { getCaseTimeline } from '@/services/case-event.service';
+import { CaseUpdateSchema } from '@/lib/validation';
 
 export async function GET(
   _request: NextRequest,
@@ -37,24 +38,19 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
+  const parsed = CaseUpdateSchema.safeParse(body);
 
-  // Only allow specific fields to be updated
-  const allowedFields = ['status', 'notes', 'urgency_level', 'intent', 'trade'];
-  const updates: Record<string, unknown> = {};
-  for (const field of allowedFields) {
-    if (body[field] !== undefined) {
-      updates[field] = body[field];
-    }
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    );
   }
 
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('email_cases')
-    .update(updates)
+    .update(parsed.data)
     .eq('id', id)
     .select()
     .single();

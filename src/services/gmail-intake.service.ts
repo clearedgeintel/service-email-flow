@@ -1,6 +1,7 @@
 import { getGmail, parseFromHeader, normalizeEmailBody } from '@/lib/gmail';
 import { getSupabase } from '@/lib/supabase';
 import { createChildLogger } from '@/lib/logger';
+import { sanitizeHtml } from '@/lib/sanitize';
 import { logCaseEvent } from './case-event.service';
 import { EventType, NormalizedEmail } from '@/types';
 
@@ -42,8 +43,8 @@ export async function fetchUnreadMessages(): Promise<NormalizedEmail[]> {
       const { name: fromName, email: fromEmail } = parseFromHeader(fromRaw);
       const subject = getHeader('subject') || '(no subject)';
 
-      // Extract body
-      const bodyRaw = extractBody(full.data.payload);
+      // Extract and sanitize body
+      const bodyRaw = sanitizeHtml(extractBody(full.data.payload));
       const bodyCleaned = normalizeEmailBody(bodyRaw);
 
       // Check for attachments

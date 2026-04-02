@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
+import { PricingUpdateSchema } from '@/lib/validation';
 
 export async function PUT(
   request: NextRequest,
@@ -11,18 +12,19 @@ export async function PUT(
 
   const { id } = await params;
   const body = await request.json();
-  const { trade, service, keywords, price_min, price_max, unit, active } = body;
+  const parsed = PricingUpdateSchema.safeParse(body);
 
-  const updates: Record<string, unknown> = {};
-  if (trade !== undefined) updates.trade = trade;
-  if (service !== undefined) updates.service = service;
-  if (keywords !== undefined) {
-    updates.keywords = Array.isArray(keywords) ? keywords : keywords.split(',').map((k: string) => k.trim());
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    );
   }
-  if (price_min !== undefined) updates.price_min = price_min;
-  if (price_max !== undefined) updates.price_max = price_max;
-  if (unit !== undefined) updates.unit = unit;
-  if (active !== undefined) updates.active = active;
+
+  const updates: Record<string, unknown> = { ...parsed.data };
+  if (updates.keywords && !Array.isArray(updates.keywords)) {
+    updates.keywords = [updates.keywords];
+  }
 
   const supabase = getSupabase();
   const { data, error } = await supabase

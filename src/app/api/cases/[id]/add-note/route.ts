@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
 import { logCaseEvent } from '@/services/case-event.service';
 import { EventType } from '@/types/events';
+import { CaseNoteSchema } from '@/lib/validation';
 
 export async function POST(
   request: NextRequest,
@@ -13,12 +14,17 @@ export async function POST(
 
   const { id } = await params;
   const caseId = parseInt(id);
-  const { note } = await request.json();
+  const body = await request.json();
+  const parsed = CaseNoteSchema.safeParse(body);
 
-  if (!note || typeof note !== 'string' || note.trim().length === 0) {
-    return NextResponse.json({ error: 'Note text is required' }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    );
   }
 
+  const note = parsed.data.note.trim();
   const supabase = getSupabase();
 
   // Get current notes
@@ -28,7 +34,7 @@ export async function POST(
     .eq('id', caseId)
     .single();
 
-  const updatedNotes = (current?.notes || '') + ` | [Admin] ${note.trim()}`;
+  const updatedNotes = (current?.notes || '') + ` | [Admin] ${note}`;
 
   const { error } = await supabase
     .from('email_cases')
@@ -43,7 +49,7 @@ export async function POST(
     caseId,
     eventType: EventType.NOTE_ADDED,
     actor: 'admin',
-    summary: note.trim().substring(0, 200),
+    summary: note.substring(0, 200),
   });
 
   return NextResponse.json({ success: true });

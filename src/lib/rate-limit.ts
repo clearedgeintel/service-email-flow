@@ -7,22 +7,26 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>();
 
-const WINDOW_MS = 60_000; // 1 minute
-const MAX_REQUESTS = 60; // 60 requests per minute
+const DEFAULT_WINDOW_MS = 60_000; // 1 minute
+const DEFAULT_MAX_REQUESTS = 60; // 60 requests per minute
 
 /** Simple in-memory rate limiter. Returns a 429 Response if exceeded, null otherwise. */
-export function rateLimit(identifier: string): NextResponse | null {
+export function rateLimit(
+  identifier: string,
+  maxRequests: number = DEFAULT_MAX_REQUESTS,
+  windowMs: number = DEFAULT_WINDOW_MS,
+): NextResponse | null {
   const now = Date.now();
   const entry = store.get(identifier);
 
   if (!entry || now > entry.resetAt) {
-    store.set(identifier, { count: 1, resetAt: now + WINDOW_MS });
+    store.set(identifier, { count: 1, resetAt: now + windowMs });
     return null;
   }
 
   entry.count++;
 
-  if (entry.count > MAX_REQUESTS) {
+  if (entry.count > maxRequests) {
     return NextResponse.json(
       { error: 'Too many requests' },
       {
