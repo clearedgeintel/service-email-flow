@@ -10,7 +10,11 @@ export function getOpenAI(): OpenAI {
     throw new Error('Missing OPENAI_API_KEY environment variable');
   }
 
-  client = new OpenAI({ apiKey });
+  client = new OpenAI({
+    apiKey,
+    timeout: 30_000, // 30 second timeout
+    maxRetries: 2,   // SDK-level retries on transient errors
+  });
   return client;
 }
 

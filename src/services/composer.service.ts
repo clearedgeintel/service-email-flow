@@ -4,6 +4,7 @@ import { getGmail } from '@/lib/gmail';
 import { getConfig } from '@/lib/config';
 import { buildHtmlEmail, buildPricingTableHtml } from '@/lib/email-template';
 import { createChildLogger } from '@/lib/logger';
+import { withCircuitBreaker } from '@/lib/circuit-breaker';
 import { logCaseEvent } from './case-event.service';
 import { lookupPricing, formatPricingForPrompt } from './pricing.service';
 import { EventType } from '@/types/events';
@@ -54,8 +55,8 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
   const isEmergency = row.status === 'ESCALATED' || row.urgency_level === 'EMERGENCY';
   const { calcomUrl, calcomLabel } = await selectCalcomLink(row.intent, row.urgency_level, isEmergency);
 
-  // Build LLM prompt
-  const replyText = await generateReplyText({
+  // Build LLM prompt with circuit breaker fallback
+  const replyParams = {
     row,
     businessName,
     businessPhone,
@@ -63,7 +64,17 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     calcomLabel,
     pricingInfo: hasPricing ? formatPricingForPrompt(pricingItems) : null,
     isEmergency,
-  });
+  };
+
+  const { result: replyText, usedFallback } = await withCircuitBreaker(
+    { name: 'openai-composer', failureThreshold: 3, resetTimeout: 60_000 },
+    () => generateReplyText(replyParams),
+    () => Promise.resolve(generateFallbackReply(replyParams)),
+  );
+
+  if (usedFallback) {
+    log.warn({ caseId }, 'Used template fallback — OpenAI unavailable');
+  }
 
   // Build paragraphs into HTML
   const paragraphs = replyText
@@ -91,6 +102,18 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     isEmergency,
     pricingHtml,
   });
+
+  // Idempotency check: re-verify reply hasn't been sent by a concurrent job
+  const { data: recheck } = await supabase
+    .from('email_cases')
+    .select('customer_reply_sent')
+    .eq('id', caseId)
+    .single();
+
+  if (recheck?.customer_reply_sent) {
+    log.info({ caseId }, 'Reply already sent (concurrent check) — skipping');
+    return;
+  }
 
   // Send via Gmail
   const gmail = getGmail();
@@ -288,6 +311,42 @@ function buildRawEmail(params: {
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
+}
+
+/** Template-based fallback when OpenAI is unavailable */
+function generateFallbackReply(params: {
+  row: Record<string, unknown>;
+  businessName: string;
+  businessPhone: string;
+  calcomUrl: string;
+  calcomLabel: string;
+  pricingInfo: string | null;
+  isEmergency: boolean;
+}): string {
+  const { row, businessName, businessPhone, isEmergency } = params;
+  const name = (row.customer_name as string) || 'there';
+
+  if (isEmergency) {
+    return `Hi ${name},
+
+Thank you for reaching out. We understand this is urgent and are treating it as a priority.
+
+If you are in any immediate danger, please call 911 first. For gas leaks, leave the building immediately and do not use any light switches or electronics.
+
+A technician from ${businessName} will contact you within 15 minutes. You can also reach us directly at ${businessPhone}.
+
+Click the button below to confirm your emergency appointment.`;
+  }
+
+  const summary = (row.problem_summary as string) || 'your inquiry';
+
+  return `Hi ${name},
+
+Thank you for contacting ${businessName} about ${summary}. We've received your message and want to help.
+
+To get started, click the button below to schedule a convenient time, or call us directly at ${businessPhone}.
+
+We look forward to assisting you!`;
 }
 
 function maskEmail(email: string): string {
