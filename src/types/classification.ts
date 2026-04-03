@@ -18,6 +18,8 @@ export const ClassificationSchema = z.object({
   urgency_level: z.enum(['EMERGENCY', 'TODAY', 'THIS_WEEK', 'ROUTINE']).default('ROUTINE'),
   requested_service_type: z.string().nullable().default(null),
   attachments_present: z.boolean().default(false),
+  sentiment_score: z.number().min(-1).max(1).default(0),
+  sentiment_label: z.enum(['frustrated', 'concerned', 'neutral', 'positive', 'grateful']).default('neutral'),
 });
 
 export type ClassificationResult = z.infer<typeof ClassificationSchema>;

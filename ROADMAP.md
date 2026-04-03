@@ -195,12 +195,12 @@
 - [ ] Business profiles with separate branding, pricing, and settings
 - [ ] Per-business API keys and webhooks
 
-### 8.4 Smart Features
-- [ ] Classification feedback loop (admin corrections improve future accuracy)
+### 8.4 Smart Features — COMPLETE
+- [x] Classification feedback loop (`POST /api/cases/:id/feedback` records corrections, tracks accuracy)
+- [x] Sentiment analysis on customer emails (score -1.0 to 1.0 + label, extracted by OpenAI)
+- [x] Repeat customer detection (`GET /api/customers` lists repeat customers with profiles)
+- [x] Auto-tagging and categorization trends (`GET /api/trends` weekly intent/trade/urgency trends)
 - [ ] Smart scheduling (suggest times based on tech availability)
-- [ ] Sentiment analysis on customer replies
-- [ ] Repeat customer detection and history display
-- [ ] Auto-tagging and categorization trends
 
 ### 8.5 Integrations
 - [ ] Webhook system (notify external services on case events)

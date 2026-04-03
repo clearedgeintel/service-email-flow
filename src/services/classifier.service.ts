@@ -30,6 +30,9 @@ RULES:
    - THIS_WEEK = customer wants it soon but not urgent
    - ROUTINE = general inquiry, no rush indicated
 
+8. For sentiment_score: rate customer tone from -1.0 (angry/frustrated) to 1.0 (happy/grateful). 0.0 = neutral.
+9. For sentiment_label: use exactly one of: "frustrated", "concerned", "neutral", "positive", "grateful"
+
 JSON SCHEMA — respond with EXACTLY this structure:
 {
   "intent": "SALES_INQUIRY|REPAIR_REQUEST|EMERGENCY|BILLING|GENERAL_QUESTION|JOB_APPLICANT|VENDOR|SPAM",
@@ -45,7 +48,9 @@ JSON SCHEMA — respond with EXACTLY this structure:
   "trade": "electric|plumbing|both|unknown",
   "urgency_level": "EMERGENCY|TODAY|THIS_WEEK|ROUTINE",
   "requested_service_type": "string or null",
-  "attachments_present": false
+  "attachments_present": false,
+  "sentiment_score": 0.0,
+  "sentiment_label": "neutral"
 }`;
 
 export async function classifyCase(caseId: number): Promise<ClassificationResult> {
@@ -165,6 +170,8 @@ Return ONLY the JSON object. No other text whatsoever.`;
       urgency_level: parsed.urgency_level,
       requested_service: parsed.requested_service_type,
       attachments_present: parsed.attachments_present,
+      sentiment_score: parsed.sentiment_score,
+      sentiment_label: parsed.sentiment_label,
       status: newStatus,
     })
     .eq('id', caseId);
