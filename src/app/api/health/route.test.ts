@@ -17,6 +17,24 @@ vi.mock('@/lib/redis', () => ({
   }),
 }));
 
+vi.mock('@/lib/queue', () => ({
+  getQueue: vi.fn().mockReturnValue({
+    getWaitingCount: vi.fn().mockResolvedValue(0),
+    getActiveCount: vi.fn().mockResolvedValue(0),
+    getFailedCount: vi.fn().mockResolvedValue(0),
+  }),
+  QUEUE_NAMES: {
+    GMAIL_INTAKE: 'gmail-intake',
+    CLASSIFIER: 'classifier',
+    ROUTER: 'router',
+    COMPOSER: 'composer',
+    NOTIFIER: 'notifier',
+    FOLLOWUP: 'followup',
+    DIGEST: 'digest',
+    ERROR_ALERT: 'error-alert',
+  },
+}));
+
 import { GET } from './route';
 
 describe('GET /api/health', () => {
@@ -26,6 +44,7 @@ describe('GET /api/health', () => {
     expect(status).toBe(200);
     expect(body.database).toBe('ok');
     expect(body.redis).toBe('ok');
+    expect(body.queues).toBeDefined();
   });
 
   it('returns 503 when DB is down', async () => {
