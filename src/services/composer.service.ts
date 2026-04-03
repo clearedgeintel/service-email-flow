@@ -3,6 +3,7 @@ import { getSupabase } from '@/lib/supabase';
 import { getGmail } from '@/lib/gmail';
 import { getConfig } from '@/lib/config';
 import { buildHtmlEmail, buildPricingTableHtml } from '@/lib/email-template';
+import { buildRawEmail } from '@/lib/email-builder';
 import { createChildLogger } from '@/lib/logger';
 import { withCircuitBreaker } from '@/lib/circuit-breaker';
 import { logCaseEvent } from './case-event.service';
@@ -124,6 +125,7 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     from: sendAs,
     subject: `Re: ${row.subject || '(no subject)'}`,
     html: htmlEmail,
+    text: replyText,
   });
 
   const sendResult = await gmail.users.messages.send({
@@ -281,36 +283,6 @@ Write the reply paragraphs now. Plain text only, no formatting, no signature.`;
     .replace(/\*\*/g, '')
     .replace(/\*/g, '')
     .trim();
-}
-
-function buildRawEmail(params: {
-  to: string;
-  from: string;
-  subject: string;
-  html: string;
-}): string {
-  const boundary = `boundary_${Date.now()}`;
-  const raw = [
-    `From: ${params.from}`,
-    `To: ${params.to}`,
-    `Subject: ${params.subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    `Content-Type: text/html; charset="UTF-8"`,
-    `Content-Transfer-Encoding: base64`,
-    '',
-    Buffer.from(params.html).toString('base64'),
-    '',
-    `--${boundary}--`,
-  ].join('\r\n');
-
-  return Buffer.from(raw)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
 }
 
 /** Template-based fallback when OpenAI is unavailable */

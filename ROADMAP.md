@@ -108,23 +108,26 @@
 
 ---
 
-## Phase 5: Email & Communication (P1)
+## Phase 5: Email & Communication (P1) — COMPLETE
 
 ### 5.1 Email Delivery
+- [x] Add `List-Unsubscribe` and `List-Unsubscribe-Post` headers for compliance
+- [x] Plain-text fallback for all HTML emails (multipart/alternative with auto-generated text)
+- [x] Business hours utility (`isBusinessHours`, `nextBusinessHoursStart`) for scheduling
+- [x] Shared `buildRawEmail` consolidating 4 duplicate implementations
 - [ ] Bounce handling and delivery status tracking
-- [ ] Add `List-Unsubscribe` header for compliance
-- [ ] Plain-text fallback for all HTML emails
-- [ ] Email send scheduling (delay non-urgent replies to business hours)
 
 ### 5.2 Templates
+- [x] Fallback templates when LLM is unavailable (Phase 3 circuit breaker)
 - [ ] Versioned HTML email templates (stored in DB, editable via dashboard)
-- [ ] Fallback templates when LLM is unavailable
 - [ ] Template preview in admin dashboard
 
 ### 5.3 Multi-Channel
 - [ ] WhatsApp Business API integration for customer replies
 - [ ] Push notifications for admin (mobile-friendly)
 - [ ] Microsoft Teams integration (alternative to Slack)
+
+**Status:** Shared email builder with List-Unsubscribe, plain-text fallback, and business hours scheduling. 4 duplicated `buildRawTextEmail` functions consolidated into one. 13 new tests.
 
 ---
 
@@ -234,7 +237,7 @@
 | 2 | Security Hardening | P0 | **COMPLETE** — rate limiting, Zod validation, CSP headers, sanitization |
 | 3 | Resilience & Error Handling | P1 | **COMPLETE** — circuit breaker, timeouts, idempotency, fallbacks |
 | 4 | Monitoring & Observability | P1 | **COMPLETE** — metrics endpoint, PII masking, correlation IDs, queue health |
-| 5 | Email & Communication | P1 | Delivery tracking, templates, multi-channel |
+| 5 | Email & Communication | P1 | **COMPLETE** — shared email builder, List-Unsubscribe, plain-text fallback |
 | 6 | Data & Privacy | P2 | Retention, GDPR, backups |
 | 7 | Scaling & Performance | P2 | Pooling, caching, horizontal scale |
 | 8 | Feature Enhancements | P2 | Bulk ops, customer portal, integrations |

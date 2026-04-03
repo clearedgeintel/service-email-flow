@@ -1,6 +1,7 @@
 import { getSupabase } from '@/lib/supabase';
 import { getGmail } from '@/lib/gmail';
 import { getConfig } from '@/lib/config';
+import { buildRawEmail } from '@/lib/email-builder';
 import { sendSlackMessage } from '@/lib/slack';
 import { createChildLogger } from '@/lib/logger';
 
@@ -97,7 +98,7 @@ ${formatCounts(urgencyCounts)}
     try {
       const gmail = getGmail();
       const sendAs = process.env.GMAIL_SEND_AS || '';
-      const rawMessage = buildRawTextEmail({ to: ownerEmail, from: sendAs, subject: emailSubject, text: digest });
+      const rawMessage = buildRawEmail({ to: ownerEmail, from: sendAs, subject: emailSubject, text: digest });
       await gmail.users.messages.send({ userId: 'me', requestBody: { raw: rawMessage } });
       log.info('Digest email sent');
     } catch (err) {
@@ -144,7 +145,7 @@ ${params.errorMessage}
 
 Please check the ServiceFlow dashboard for details.`;
 
-      const rawMessage = buildRawTextEmail({ to: ownerEmail, from: sendAs, subject, text: body });
+      const rawMessage = buildRawEmail({ to: ownerEmail, from: sendAs, subject, text: body });
       await gmail.users.messages.send({ userId: 'me', requestBody: { raw: rawMessage } });
     } catch (err) {
       log.error({ err }, 'Failed to send error alert email');
@@ -162,22 +163,4 @@ function formatCounts(counts: Record<string, number>): string {
   const entries = Object.entries(counts);
   if (entries.length === 0) return '  (no data)';
   return entries.map(([k, v]) => `  ${k.padEnd(30)} ${v}`).join('\n');
-}
-
-function buildRawTextEmail(params: { to: string; from: string; subject: string; text: string }): string {
-  const raw = [
-    `From: ${params.from}`,
-    `To: ${params.to}`,
-    `Subject: ${params.subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset="UTF-8"`,
-    '',
-    params.text,
-  ].join('\r\n');
-
-  return Buffer.from(raw)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
 }

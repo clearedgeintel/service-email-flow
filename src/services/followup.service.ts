@@ -1,6 +1,7 @@
 import { getSupabase } from '@/lib/supabase';
 import { getGmail } from '@/lib/gmail';
 import { getConfig } from '@/lib/config';
+import { buildRawEmail } from '@/lib/email-builder';
 import { createChildLogger } from '@/lib/logger';
 import { logCaseEvent } from './case-event.service';
 import { EventType } from '@/types/events';
@@ -129,7 +130,7 @@ ${businessPhone}`;
   const gmail = getGmail();
   const sendAs = process.env.GMAIL_SEND_AS || '';
 
-  const rawMessage = buildRawTextEmail({ to: customerEmail, from: sendAs, subject: emailSubject, text: emailBody });
+  const rawMessage = buildRawEmail({ to: customerEmail, from: sendAs, subject: emailSubject, text: emailBody });
   await gmail.users.messages.send({ userId: 'me', requestBody: { raw: rawMessage } });
 
   // Send SMS if phone available
@@ -210,7 +211,7 @@ Issue: ${row.problem_summary || 'See case details'}
 
 Please call the customer manually or mark as closed.`;
 
-        const rawMessage = buildRawTextEmail({ to: ownerEmail, from: sendAs, subject, text: body });
+        const rawMessage = buildRawEmail({ to: ownerEmail, from: sendAs, subject, text: body });
         await gmail.users.messages.send({ userId: 'me', requestBody: { raw: rawMessage } });
       } catch (err) {
         log.error({ caseId: row.id, err }, 'Failed to send manual call notification');
@@ -246,24 +247,6 @@ async function sendFollowupSms(
   } catch (err) {
     log.warn({ caseId: row.id, err }, 'Follow-up SMS failed (non-critical)');
   }
-}
-
-function buildRawTextEmail(params: { to: string; from: string; subject: string; text: string }): string {
-  const raw = [
-    `From: ${params.from}`,
-    `To: ${params.to}`,
-    `Subject: ${params.subject}`,
-    `MIME-Version: 1.0`,
-    `Content-Type: text/plain; charset="UTF-8"`,
-    '',
-    params.text,
-  ].join('\r\n');
-
-  return Buffer.from(raw)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
 }
 
 function maskEmail(email: string): string {
