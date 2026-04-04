@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createMockSupabase, createMockOpenAI } from '@/test/mocks';
+import { createMockSupabase, createMockAnthropic } from '@/test/mocks';
 
 vi.mock('@/lib/supabase', () => ({
   getSupabase: vi.fn(),
 }));
 
-vi.mock('@/lib/openai', () => ({
-  getOpenAI: vi.fn(),
-  getModel: vi.fn().mockReturnValue('gpt-4o'),
+vi.mock('@/lib/anthropic', () => ({
+  getAnthropic: vi.fn(),
+  getModel: vi.fn().mockReturnValue('claude-sonnet-4-20250514'),
 }));
 
 vi.mock('./case-event.service', () => ({
@@ -25,10 +25,10 @@ vi.mock('@/lib/logger', () => ({
 
 import { classifyCase } from './classifier.service';
 import { getSupabase } from '@/lib/supabase';
-import { getOpenAI } from '@/lib/openai';
+import { getAnthropic } from '@/lib/anthropic';
 
 const mockedGetSupabase = vi.mocked(getSupabase);
-const mockedGetOpenAI = vi.mocked(getOpenAI);
+const mockedGetOpenAI = vi.mocked(getAnthropic);
 
 const sampleCase = {
   id: 1,
@@ -63,7 +63,7 @@ describe('classifyCase', () => {
     const mockSb = createMockSupabase({ data: sampleCase });
     mockedGetSupabase.mockReturnValue(mockSb as any);
 
-    const mockAI = createMockOpenAI(JSON.stringify(validClassification));
+    const mockAI = createMockAnthropic(JSON.stringify(validClassification));
     mockedGetOpenAI.mockReturnValue(mockAI as any);
 
     const result = await classifyCase(1);
@@ -81,7 +81,7 @@ describe('classifyCase', () => {
     const mockSb = createMockSupabase({ data: sampleCase });
     mockedGetSupabase.mockReturnValue(mockSb as any);
 
-    const mockAI = createMockOpenAI(JSON.stringify(lowConfidence));
+    const mockAI = createMockAnthropic(JSON.stringify(lowConfidence));
     mockedGetOpenAI.mockReturnValue(mockAI as any);
 
     const result = await classifyCase(1);
@@ -96,7 +96,7 @@ describe('classifyCase', () => {
     const mockSb = createMockSupabase({ data: sampleCase });
     mockedGetSupabase.mockReturnValue(mockSb as any);
 
-    const mockAI = createMockOpenAI(wrapped);
+    const mockAI = createMockAnthropic(wrapped);
     mockedGetOpenAI.mockReturnValue(mockAI as any);
 
     const result = await classifyCase(1);
@@ -107,7 +107,7 @@ describe('classifyCase', () => {
     const mockSb = createMockSupabase({ data: sampleCase });
     mockedGetSupabase.mockReturnValue(mockSb as any);
 
-    const mockAI = createMockOpenAI('this is not json at all');
+    const mockAI = createMockAnthropic('this is not json at all');
     mockedGetOpenAI.mockReturnValue(mockAI as any);
 
     const result = await classifyCase(1);
@@ -149,7 +149,7 @@ describe('classifyCase', () => {
       });
     });
 
-    const mockAI = createMockOpenAI(JSON.stringify(validClassification));
+    const mockAI = createMockAnthropic(JSON.stringify(validClassification));
     mockedGetOpenAI.mockReturnValue(mockAI as any);
 
     await expect(classifyCase(1)).rejects.toThrow('Failed to update case #1');

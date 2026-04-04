@@ -1,4 +1,4 @@
-import { getOpenAI, getModel } from '@/lib/openai';
+import { getAnthropic, getModel } from '@/lib/anthropic';
 import { getSupabase } from '@/lib/supabase';
 import { createChildLogger } from '@/lib/logger';
 import { logCaseEvent } from './case-event.service';
@@ -80,20 +80,18 @@ SENDER EMAIL: ${row.from_email || 'unknown'}
 
 Return ONLY the JSON object. No other text whatsoever.`;
 
-  // Call OpenAI
-  const openai = getOpenAI();
-  const response = await openai.chat.completions.create({
+  // Call Anthropic
+  const anthropic = getAnthropic();
+  const response = await anthropic.messages.create({
     model: getModel(),
-    temperature: 0.1,
     max_tokens: 1000,
-    response_format: { type: 'json_object' },
+    system: SYSTEM_PROMPT,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
     ],
   });
 
-  const rawContent = response.choices[0]?.message?.content || '{}';
+  const rawContent = response.content[0]?.type === 'text' ? response.content[0].text : '{}';
 
   // Parse and validate with zod
   let parsed: ClassificationResult;

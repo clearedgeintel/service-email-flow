@@ -88,15 +88,13 @@ export function createMockSupabase(overrides?: {
   return mock;
 }
 
-/** Creates a mock OpenAI client */
-export function createMockOpenAI(responseContent: string = '{}') {
+/** Creates a mock Anthropic client */
+export function createMockAnthropic(responseContent: string = '{}') {
   return {
-    chat: {
-      completions: {
-        create: vi.fn().mockResolvedValue({
-          choices: [{ message: { content: responseContent } }],
-        }),
-      },
+    messages: {
+      create: vi.fn().mockResolvedValue({
+        content: [{ type: 'text', text: responseContent }],
+      }),
     },
   };
 }

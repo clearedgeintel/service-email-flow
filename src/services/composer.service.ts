@@ -1,4 +1,4 @@
-import { getOpenAI, getModel } from '@/lib/openai';
+import { getAnthropic, getModel } from '@/lib/anthropic';
 import { getSupabase } from '@/lib/supabase';
 import { getGmail } from '@/lib/gmail';
 import { getConfig } from '@/lib/config';
@@ -262,18 +262,17 @@ ${context}
 
 Write the reply paragraphs now. Plain text only, no formatting, no signature.`;
 
-  const openai = getOpenAI();
-  const response = await openai.chat.completions.create({
+  const anthropic = getAnthropic();
+  const response = await anthropic.messages.create({
     model: getModel(),
-    temperature: 0.4,
     max_tokens: 1200,
+    system: systemPrompt,
     messages: [
-      { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
   });
 
-  const content = (response.choices[0]?.message?.content || '').trim();
+  const content = (response.content[0]?.type === 'text' ? response.content[0].text : '').trim();
 
   // Clean any accidental markdown/formatting
   return content
