@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { Inbox, BarChart3, Settings, LogOut, Zap, Menu, X } from 'lucide-react';
+import { Inbox, BarChart3, Settings, LogOut, Zap, Menu, X, Mail, Circle } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Cases', icon: Inbox },
@@ -16,11 +16,60 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [mailbox, setMailbox] = useState<string>('');
+  const [systemStatus, setSystemStatus] = useState<'loading' | 'connected' | 'error'>('loading');
+
+  useEffect(() => {
+    fetch('/api/mailbox-status')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
+          setMailbox(data.mailbox || '');
+          setSystemStatus(data.healthy ? 'connected' : 'error');
+        }
+      })
+      .catch(() => setSystemStatus('error'));
+
+    const interval = setInterval(() => {
+      fetch('/api/mailbox-status')
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data) setSystemStatus(data.healthy ? 'connected' : 'error');
+        })
+        .catch(() => setSystemStatus('error'));
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };
+
+  const statusIndicator = (
+    <div className="px-4 py-3 border-t border-gray-700">
+      <div className="flex items-center gap-2">
+        <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+        <span className="text-xs text-gray-400">Monitoring Inbox</span>
+      </div>
+      <div className="flex items-center gap-1.5 mt-1.5 ml-[22px]">
+        <Circle
+          className={clsx(
+            'w-2 h-2 shrink-0',
+            systemStatus === 'connected' && 'text-green-400 fill-green-400',
+            systemStatus === 'error' && 'text-red-400 fill-red-400',
+            systemStatus === 'loading' && 'text-yellow-400 fill-yellow-400',
+          )}
+        />
+        <span className="text-xs text-gray-300 truncate">
+          {mailbox || 'Not configured'}
+        </span>
+      </div>
+      <p className="text-[10px] text-gray-500 mt-1 ml-[22px]">
+        {systemStatus === 'connected' ? 'System healthy' : systemStatus === 'error' ? 'Connection issue' : 'Checking...'}
+      </p>
+    </div>
+  );
 
   const navContent = (
     <>
@@ -63,6 +112,8 @@ export function Sidebar() {
         })}
       </nav>
 
+      {statusIndicator}
+
       <div className="p-4 border-t border-gray-700">
         <button
           onClick={handleLogout}
@@ -83,9 +134,22 @@ export function Sidebar() {
           <Zap className="w-5 h-5 text-blue-400" />
           <span className="font-bold">ServiceFlow</span>
         </div>
-        <button onClick={() => setOpen(true)} className="p-1.5 rounded-lg hover:bg-gray-800">
-          <Menu className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Circle
+              className={clsx(
+                'w-2 h-2',
+                systemStatus === 'connected' && 'text-green-400 fill-green-400',
+                systemStatus === 'error' && 'text-red-400 fill-red-400',
+                systemStatus === 'loading' && 'text-yellow-400 fill-yellow-400',
+              )}
+            />
+            <span className="text-xs text-gray-400 max-w-[120px] truncate">{mailbox || '—'}</span>
+          </div>
+          <button onClick={() => setOpen(true)} className="p-1.5 rounded-lg hover:bg-gray-800">
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Mobile overlay */}
