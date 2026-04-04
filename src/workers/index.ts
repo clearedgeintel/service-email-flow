@@ -1,3 +1,6 @@
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
 import { setupRepeatableJobs } from '@/lib/queue';
 import { logger } from '@/lib/logger';
 import { startGmailIntakeWorker } from './gmail-intake.worker';

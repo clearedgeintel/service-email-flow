@@ -116,7 +116,10 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     return;
   }
 
-  // Send via Gmail
+  // Determine send mode: auto-send emergencies, otherwise check setting
+  const autoReply = await getConfig<boolean>('auto_reply', false);
+  const shouldSendNow = isEmergency || autoReply;
+
   const gmail = getGmail();
   const sendAs = process.env.GMAIL_SEND_AS || '';
 
@@ -128,17 +131,36 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     text: replyText,
   });
 
-  const sendResult = await gmail.users.messages.send({
-    userId: 'me',
-    requestBody: { raw: rawMessage },
-  });
+  let sendResult: { data: { id?: string | null } };
+
+  if (shouldSendNow) {
+    // Send immediately
+    sendResult = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: { raw: rawMessage },
+    });
+    log.info({ caseId, mode: 'sent' }, 'Reply sent immediately');
+  } else {
+    // Save as draft for review
+    sendResult = await gmail.users.drafts.create({
+      userId: 'me',
+      requestBody: {
+        message: { raw: rawMessage, threadId: row.gmail_thread_id || undefined },
+      },
+    });
+    log.info({ caseId, mode: 'draft' }, 'Reply saved as draft for review');
+  }
 
   // Update case
   const { error: updateError } = await supabase
     .from('email_cases')
     .update({
-      customer_reply_sent: true,
-      customer_reply_at: new Date().toISOString(),
+      customer_reply_sent: shouldSendNow,
+      customer_reply_at: shouldSendNow ? new Date().toISOString() : null,
+      status: shouldSendNow ? undefined : 'NEEDS_REVIEW',
+      notes: shouldSendNow
+        ? row.notes
+        : (row.notes || '') + ' | Draft reply saved — pending admin review',
     })
     .eq('id', caseId);
 
@@ -150,19 +172,18 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
   await logCaseEvent({
     caseId,
     eventType: EventType.REPLY_SENT,
-    summary: `Customer reply sent to ${maskEmail(customerEmail)} — ${isEmergency ? 'EMERGENCY' : row.urgency_level}`,
+    summary: shouldSendNow
+      ? `Reply sent to ${maskEmail(customerEmail)} — ${isEmergency ? 'EMERGENCY' : row.urgency_level}`
+      : `Draft reply saved for ${maskEmail(customerEmail)} — pending review`,
     metadata: {
-      gmail_send_id: sendResult.data.id,
+      gmail_id: sendResult.data.id,
+      mode: shouldSendNow ? 'sent' : 'draft',
       has_pricing: hasPricing,
       calcom_url: calcomUrl,
       is_emergency: isEmergency,
+      used_fallback: usedFallback,
     },
   });
-
-  log.info(
-    { caseId, to: maskEmail(customerEmail), emergency: isEmergency },
-    'Customer reply sent',
-  );
 }
 
 async function selectCalcomLink(

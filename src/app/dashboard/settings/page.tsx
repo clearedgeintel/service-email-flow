@@ -181,6 +181,27 @@ export default function SettingsPage() {
             </div>
           ))}
 
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 mb-4">Reply Mode</h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Auto-send replies</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {settings.auto_reply === 'true'
+                    ? 'Replies are sent automatically to customers'
+                    : 'Replies are saved as Gmail drafts for your review (emergencies always send immediately)'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, auto_reply: settings.auto_reply === 'true' ? 'false' : 'true' })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.auto_reply === 'true' ? 'bg-blue-600' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.auto_reply === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+          </div>
+
           <button
             onClick={saveSettings}
             disabled={saving}
