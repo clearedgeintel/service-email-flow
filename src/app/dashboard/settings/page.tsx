@@ -172,7 +172,7 @@ export default function SettingsPage() {
                       type={field.type}
                       value={settings[field.key] || ''}
                       onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
                       step={field.type === 'number' ? '0.01' : undefined}
                     />
                   </div>
@@ -238,7 +238,7 @@ export default function SettingsPage() {
               <select
                 value={newItem.trade}
                 onChange={(e) => setNewItem({ ...newItem, trade: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
               >
                 <option value="electric">Electric</option>
                 <option value="plumbing">Plumbing</option>
@@ -260,20 +260,20 @@ export default function SettingsPage() {
                 placeholder="Min $"
                 value={newItem.price_min}
                 onChange={(e) => setNewItem({ ...newItem, price_min: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
               />
               <input
                 type="number"
                 placeholder="Max $"
                 value={newItem.price_max}
                 onChange={(e) => setNewItem({ ...newItem, price_max: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
               />
               <input
                 placeholder="Unit (e.g. per job)"
                 value={newItem.unit}
                 onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
               />
             </div>
             <button
