@@ -26,7 +26,7 @@ const URGENCIES = ['', 'EMERGENCY', 'TODAY', 'THIS_WEEK', 'ROUTINE'];
 
 export default function CaseQueuePage() {
   return (
-    <Suspense fallback={<div className="p-6 text-gray-400">Loading...</div>}>
+    <Suspense fallback={<div className="p-4 md:p-6 text-gray-400">Loading...</div>}>
       <CaseQueueContent />
     </Suspense>
   );
@@ -97,26 +97,27 @@ function CaseQueueContent() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 md:mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cases</h1>
-          <p className="text-sm text-gray-500 mt-1">{total} total cases</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Cases</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{total} total</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Filter className="w-4 h-4" />
-            Filters
+            <span className="hidden sm:inline">Filters</span>
           </button>
           <button
             onClick={fetchCases}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
@@ -127,21 +128,21 @@ function CaseQueueContent() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, email, subject, or summary..."
+            placeholder="Search by name, email, subject..."
             defaultValue={search}
             onKeyDown={(e) => {
               if (e.key === 'Enter') updateFilter('search', (e.target as HTMLInputElement).value);
             }}
-            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
           />
         </div>
 
         {showFilters && (
-          <div className="flex flex-wrap gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+          <div className="flex flex-wrap gap-2 p-3 bg-white border border-gray-200 rounded-lg">
             <select
               value={status}
               onChange={(e) => updateFilter('status', e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+              className="flex-1 min-w-[120px] px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
             >
               <option value="">All Statuses</option>
               {STATUSES.filter(Boolean).map((s) => (
@@ -151,7 +152,7 @@ function CaseQueueContent() {
             <select
               value={intent}
               onChange={(e) => updateFilter('intent', e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+              className="flex-1 min-w-[120px] px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
             >
               <option value="">All Intents</option>
               {INTENTS.filter(Boolean).map((i) => (
@@ -161,7 +162,7 @@ function CaseQueueContent() {
             <select
               value={urgency}
               onChange={(e) => updateFilter('urgency', e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+              className="flex-1 min-w-[120px] px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900"
             >
               <option value="">All Urgencies</option>
               {URGENCIES.filter(Boolean).map((u) => (
@@ -172,8 +173,8 @@ function CaseQueueContent() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      {/* Desktop Table */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -222,26 +223,70 @@ function CaseQueueContent() {
           </table>
         </div>
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-            <p className="text-sm text-gray-500">
-              Page {page} of {totalPages}
-            </p>
+            <p className="text-sm text-gray-500">Page {page} of {totalPages}</p>
             <div className="flex gap-1">
+              <button onClick={() => goToPage(page - 1)} disabled={page <= 1} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button onClick={() => goToPage(page + 1)} disabled={page >= totalPages} className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <div className="text-center py-12 text-gray-400">Loading...</div>
+        ) : cases.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">No cases found</div>
+        ) : (
+          cases.map((c) => (
+            <Link
+              key={c.id}
+              href={`/dashboard/cases/${c.id}`}
+              className="block bg-white border border-gray-200 rounded-xl p-4 active:bg-blue-50 transition-colors"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{c.customer_name || c.from_email}</p>
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{c.subject || '(no subject)'}</p>
+                </div>
+                <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">#{c.id}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                <StatusBadge status={c.status} />
+                {c.intent && <IntentBadge intent={c.intent} />}
+                {c.urgency_level && <UrgencyBadge urgency={c.urgency_level} />}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                {new Date(c.received_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </Link>
+          ))
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between py-3">
+            <p className="text-sm text-gray-500">Page {page} of {totalPages}</p>
+            <div className="flex gap-2">
               <button
                 onClick={() => goToPage(page - 1)}
                 disabled={page <= 1}
-                className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-30"
               >
-                <ChevronLeft className="w-4 h-4" />
+                Prev
               </button>
               <button
                 onClick={() => goToPage(page + 1)}
                 disabled={page >= totalPages}
-                className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-30"
               >
-                <ChevronRight className="w-4 h-4" />
+                Next
               </button>
             </div>
           </div>
