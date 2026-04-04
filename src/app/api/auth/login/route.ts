@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createSession, setSessionCookie } from '@/lib/auth';
+import { createSession } from '@/lib/auth';
 import { rateLimit } from '@/lib/rate-limit';
+
+const SESSION_COOKIE = 'sf_session';
+const SESSION_TTL_HOURS = 24;
 
 const LoginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
@@ -31,9 +34,18 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionId = await createSession();
-    await setSessionCookie(sessionId);
 
-    return NextResponse.json({ success: true });
+    // Set cookie directly on the response for reliability
+    const response = NextResponse.json({ success: true });
+    response.cookies.set(SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_TTL_HOURS * 60 * 60,
+    });
+
+    return response;
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

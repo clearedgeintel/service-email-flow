@@ -10,7 +10,11 @@ export async function createSession(): Promise<string> {
   const id = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000).toISOString();
 
-  await supabase.from('admin_sessions').insert({ id, expires_at: expiresAt });
+  const { error } = await supabase.from('admin_sessions').insert({ id, expires_at: expiresAt });
+
+  if (error) {
+    throw new Error(`Failed to create session: ${error.message}`);
+  }
 
   return id;
 }
