@@ -24,7 +24,12 @@ export async function GET(request: NextRequest) {
     .from('email_cases')
     .select('*', { count: 'exact' });
 
-  if (status) query = query.eq('status', status);
+  if (status) {
+    query = query.eq('status', status);
+  } else {
+    // Hide closed and spam by default
+    query = query.neq('status', 'CLOSED');
+  }
   if (intent) query = query.eq('intent', intent);
   if (urgency) query = query.eq('urgency_level', urgency);
   if (trade) query = query.eq('trade', trade);
