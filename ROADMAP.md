@@ -203,6 +203,7 @@
 - [ ] Smart scheduling (suggest times based on tech availability)
 
 ### 8.5 Integrations
+- [x] Cal.com webhook integration (booking tracking, auto-close on meeting end)
 - [ ] Webhook system (notify external services on case events)
 - [ ] Zapier / Make integration
 - [ ] QuickBooks / invoice generation
