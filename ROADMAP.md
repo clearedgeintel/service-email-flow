@@ -178,11 +178,17 @@
 ## Phase 8: Feature Enhancements (P2)
 
 ### 8.1 Admin Dashboard
+- [x] Mobile-responsive optimization (collapsible sidebar, card view, touch targets)
+- [x] Mailbox status indicator (sidebar + mobile header)
+- [x] Hide closed cases by default (filter to show)
+- [x] In-dashboard draft reply approval (preview, approve & send, discard)
+- [x] Clickable timeline events with modal showing full metadata
+- [x] Gmail label sync to case status (ServiceFlow/Received, Classified, etc.)
+- [x] Draft vs auto-send reply mode toggle
 - [ ] Bulk actions (select multiple cases → close, reclassify, assign)
 - [ ] Saved filters / custom views
 - [ ] CSV/PDF export for cases and analytics
 - [ ] Dark mode
-- [ ] Mobile-responsive optimization
 - [ ] Real-time updates (WebSocket or SSE for new cases)
 
 ### 8.2 Customer Portal
