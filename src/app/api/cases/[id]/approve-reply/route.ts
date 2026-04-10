@@ -26,7 +26,7 @@ export async function POST(
 
   const { data: row, error: fetchError } = await supabase
     .from('email_cases')
-    .select('draft_reply, draft_gmail_id, gmail_thread_id, subject')
+    .select('draft_reply, draft_gmail_id, gmail_thread_id, gmail_message_id, subject')
     .eq('id', caseId)
     .single();
 
@@ -81,6 +81,10 @@ export async function POST(
       status: 'RESPONDED_PENDING_BOOKING',
     })
     .eq('id', caseId);
+
+  // Sync Gmail label
+  const { syncMessageLabel } = await import('@/lib/gmail-labels');
+  await syncMessageLabel(row.gmail_message_id, 'RESPONDED_PENDING_BOOKING');
 
   await logCaseEvent({
     caseId,

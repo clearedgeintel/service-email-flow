@@ -59,5 +59,11 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Sync Gmail label if status changed
+  if (parsed.data.status && data) {
+    const { syncMessageLabel } = await import('@/lib/gmail-labels');
+    await syncMessageLabel(data.gmail_message_id, parsed.data.status);
+  }
+
   return NextResponse.json({ case: data });
 }

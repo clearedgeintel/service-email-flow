@@ -100,10 +100,9 @@ export async function routeCase(caseId: number): Promise<RoutingDecision> {
     throw new Error(`Failed to update case #${caseId}: ${updateError.message}`);
   }
 
-  // Label Gmail message
-  if (row.gmail_message_id) {
-    await labelGmailMessage(row.gmail_message_id, decision.gmailLabels);
-  }
+  // Sync Gmail label to match new status
+  const { syncMessageLabel } = await import('@/lib/gmail-labels');
+  await syncMessageLabel(row.gmail_message_id, decision.newStatus);
 
   // Log event
   await logCaseEvent({
@@ -132,16 +131,3 @@ export async function routeCase(caseId: number): Promise<RoutingDecision> {
   return decision;
 }
 
-async function labelGmailMessage(messageId: string, labels: string[]): Promise<void> {
-  try {
-    const { getGmail } = await import('@/lib/gmail');
-    const gmail = getGmail();
-    await gmail.users.messages.modify({
-      userId: 'me',
-      id: messageId,
-      requestBody: { addLabelIds: labels },
-    });
-  } catch {
-    // Label may not exist — not critical
-  }
-}

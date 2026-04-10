@@ -185,8 +185,9 @@ export async function deduplicateAndStore(emails: NormalizedEmail[]): Promise<nu
         },
       });
 
-      // Label and mark as read in Gmail
-      await labelMessage(email.gmail_message_id, 'n8n/received');
+      // Sync Gmail label and mark as read
+      const { syncMessageLabel } = await import('@/lib/gmail-labels');
+      await syncMessageLabel(email.gmail_message_id, 'RECEIVED');
       await markAsRead(email.gmail_message_id);
 
       log.info(
@@ -209,20 +210,6 @@ async function markAsRead(messageId: string): Promise<void> {
     });
   } catch (err) {
     log.warn({ messageId, err }, 'Failed to mark message as read');
-  }
-}
-
-async function labelMessage(messageId: string, label: string): Promise<void> {
-  try {
-    const gmail = getGmail();
-    // Try to add label — will fail silently if label doesn't exist
-    await gmail.users.messages.modify({
-      userId: 'me',
-      id: messageId,
-      requestBody: { addLabelIds: [label] },
-    });
-  } catch {
-    // Label may not exist yet — not critical
   }
 }
 

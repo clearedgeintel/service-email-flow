@@ -178,6 +178,10 @@ Return ONLY the JSON object. No other text whatsoever.`;
     throw new Error(`Failed to update case #${caseId}: ${updateError.message}`);
   }
 
+  // Sync Gmail label to match new status
+  const { syncMessageLabel } = await import('@/lib/gmail-labels');
+  await syncMessageLabel(row.gmail_message_id, newStatus);
+
   // Log event
   await logCaseEvent({
     caseId,

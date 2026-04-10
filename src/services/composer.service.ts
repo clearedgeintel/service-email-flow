@@ -181,6 +181,11 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     log.error({ caseId, error: updateError }, 'Failed to update reply status');
   }
 
+  // Sync Gmail label based on new status
+  const newStatus = shouldSendNow ? (row.status || 'RESPONDED_PENDING_BOOKING') : 'NEEDS_REVIEW';
+  const { syncMessageLabel } = await import('@/lib/gmail-labels');
+  await syncMessageLabel(row.gmail_message_id, newStatus);
+
   // Log event
   await logCaseEvent({
     caseId,

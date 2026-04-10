@@ -16,18 +16,24 @@ export async function POST(
   const caseId = parseInt(id);
   const supabase = getSupabase();
 
-  const { error } = await supabase
+  const { data: row, error } = await supabase
     .from('email_cases')
     .update({
       status: 'ESCALATED',
       urgency_level: 'EMERGENCY',
       requires_tech_notify: true,
     })
-    .eq('id', caseId);
+    .eq('id', caseId)
+    .select('gmail_message_id')
+    .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Sync Gmail label
+  const { syncMessageLabel } = await import('@/lib/gmail-labels');
+  await syncMessageLabel(row?.gmail_message_id || null, 'ESCALATED');
 
   // Enqueue tech notification
   const queue = getQueue(QUEUE_NAMES.NOTIFIER);
