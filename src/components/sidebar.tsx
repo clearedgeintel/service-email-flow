@@ -4,7 +4,27 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { Inbox, BarChart3, Settings, LogOut, Zap, Menu, X, Mail, Circle } from 'lucide-react';
+import { Inbox, BarChart3, Settings, LogOut, Zap, Menu, X, Mail, Circle, Moon, Sun } from 'lucide-react';
+
+const THEME_KEY = 'serviceflow:theme';
+
+function useTheme() {
+  const [theme, setThemeState] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    const stored = localStorage.getItem(THEME_KEY);
+    const isDark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    setThemeState(isDark ? 'dark' : 'light');
+  }, []);
+
+  const setTheme = (next: 'light' | 'dark') => {
+    setThemeState(next);
+    localStorage.setItem(THEME_KEY, next);
+    document.documentElement.classList.toggle('dark', next === 'dark');
+  };
+
+  return { theme, setTheme };
+}
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Cases', icon: Inbox },
@@ -18,6 +38,7 @@ export function Sidebar() {
   const [open, setOpen] = useState(false);
   const [mailbox, setMailbox] = useState<string>('');
   const [systemStatus, setSystemStatus] = useState<'loading' | 'connected' | 'error'>('loading');
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     fetch('/api/mailbox-status')
@@ -114,7 +135,14 @@ export function Sidebar() {
 
       {statusIndicator}
 
-      <div className="p-4 border-t border-gray-700">
+      <div className="p-4 border-t border-gray-700 space-y-1">
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white w-full transition-colors"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+        </button>
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white w-full transition-colors"
