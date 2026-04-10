@@ -152,12 +152,25 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
   }
 
   // Update case
+  const draftReply = shouldSendNow
+    ? null
+    : {
+        subject: `Re: ${row.subject || '(no subject)'}`,
+        body_text: replyText,
+        body_html: htmlEmail,
+        to: customerEmail,
+        created_at: new Date().toISOString(),
+        used_fallback: usedFallback,
+      };
+
   const { error: updateError } = await supabase
     .from('email_cases')
     .update({
       customer_reply_sent: shouldSendNow,
       customer_reply_at: shouldSendNow ? new Date().toISOString() : null,
       status: shouldSendNow ? undefined : 'NEEDS_REVIEW',
+      draft_reply: draftReply,
+      draft_gmail_id: shouldSendNow ? null : sendResult.data.id,
       notes: shouldSendNow
         ? row.notes
         : (row.notes || '') + ' | Draft reply saved — pending admin review',
