@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { StatusBadge, UrgencyBadge, IntentBadge } from '@/components/status-badge';
 import {
   ArrowLeft, RefreshCw, Send, AlertTriangle, X, MessageSquare, Clock,
-  User, Mail, Phone, MapPin, FileText, Calendar,
+  User, Mail, Phone, MapPin, FileText, Calendar, CheckCircle2,
 } from 'lucide-react';
 
 interface CaseDetail {
@@ -39,6 +39,11 @@ interface CaseDetail {
   notes: string | null;
   received_at: string;
   updated_at: string;
+  booking_id: string | null;
+  booking_status: string | null;
+  booking_start_at: string | null;
+  booking_end_at: string | null;
+  booking_cancelled_reason: string | null;
 }
 
 interface TimelineEvent {
@@ -138,6 +143,51 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
               <InfoRow icon={FileText} label="Trade" value={c.trade} />
             </div>
           </div>
+
+          {/* Booking (if present) */}
+          {c.booking_id && (
+            <div className={`border rounded-xl p-5 ${
+              c.booking_status === 'cancelled'
+                ? 'bg-red-50 border-red-200'
+                : c.booking_status === 'completed'
+                  ? 'bg-gray-50 border-gray-200'
+                  : 'bg-green-50 border-green-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 className={`w-5 h-5 ${
+                  c.booking_status === 'cancelled' ? 'text-red-600' :
+                  c.booking_status === 'completed' ? 'text-gray-600' : 'text-green-600'
+                }`} />
+                <h2 className="font-semibold text-gray-900">
+                  Appointment {c.booking_status === 'booked' ? 'Booked' : c.booking_status === 'cancelled' ? 'Cancelled' : c.booking_status === 'completed' ? 'Completed' : 'Scheduled'}
+                </h2>
+              </div>
+              <dl className="space-y-1.5 text-sm">
+                {c.booking_start_at && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Start</dt>
+                    <dd className="text-gray-900 font-medium">{new Date(c.booking_start_at).toLocaleString()}</dd>
+                  </div>
+                )}
+                {c.booking_end_at && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">End</dt>
+                    <dd className="text-gray-900 font-medium">{new Date(c.booking_end_at).toLocaleString()}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <dt className="text-gray-600">Booking ID</dt>
+                  <dd className="text-gray-500 font-mono text-xs">{c.booking_id}</dd>
+                </div>
+                {c.booking_cancelled_reason && (
+                  <div className="flex justify-between">
+                    <dt className="text-gray-600">Reason</dt>
+                    <dd className="text-gray-800">{c.booking_cancelled_reason}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
 
           {/* Problem Summary */}
           <div className="bg-white border border-gray-200 rounded-xl p-5">
