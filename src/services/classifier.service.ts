@@ -142,6 +142,8 @@ Return ONLY the JSON object. No other text whatsoever.`;
       urgency_level: 'ROUTINE',
       requested_service_type: null,
       attachments_present: row.has_attachments || false,
+      sentiment_score: 0,
+      sentiment_label: 'neutral',
     };
     validationErrors = [`JSON parse error: ${e instanceof Error ? e.message : String(e)}`];
   }

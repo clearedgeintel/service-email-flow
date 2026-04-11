@@ -28,7 +28,7 @@ export function createRequest(
     init.headers = { 'Content-Type': 'application/json' };
   }
 
-  const request = new NextRequest(fullUrl, init);
+  const request = new NextRequest(fullUrl, init as unknown as ConstructorParameters<typeof NextRequest>[1]);
 
   // Set cookies if provided
   if (options?.cookies) {
