@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Plus, Trash2, Check } from 'lucide-react';
+import { Save, Plus, Trash2, Check, Tag, RefreshCw } from 'lucide-react';
 
 interface PricingItem {
   id: number;
@@ -62,6 +62,27 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<'config' | 'pricing'>('config');
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncResult, setResyncResult] = useState<string | null>(null);
+
+  const resyncLabels = async () => {
+    if (!confirm('Resync Gmail labels for all existing cases? This may take a few minutes.')) return;
+    setResyncing(true);
+    setResyncResult(null);
+    try {
+      const res = await fetch('/api/admin/resync-labels', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setResyncResult(`Synced ${data.synced} / ${data.total} cases${data.failed > 0 ? ` (${data.failed} failed)` : ''}`);
+      } else {
+        setResyncResult(`Error: ${data.error || 'unknown'}`);
+      }
+    } catch (e) {
+      setResyncResult(`Error: ${e instanceof Error ? e.message : 'unknown'}`);
+    } finally {
+      setResyncing(false);
+    }
+  };
 
   useEffect(() => {
     Promise.all([
@@ -199,6 +220,31 @@ export default function SettingsPage() {
               >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.auto_reply === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Tag className="w-4 h-4 text-gray-600" />
+              <h2 className="font-semibold text-gray-900">Gmail Labels</h2>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              Sync ServiceFlow labels to all existing cases in Gmail. New cases are labeled automatically,
+              but this will retroactively apply labels to cases that existed before label sync was added.
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={resyncLabels}
+                disabled={resyncing}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 ${resyncing ? 'animate-spin' : ''}`} />
+                {resyncing ? 'Syncing...' : 'Resync all labels'}
+              </button>
+              {resyncResult && (
+                <span className="text-sm text-gray-600">{resyncResult}</span>
+              )}
             </div>
           </div>
 

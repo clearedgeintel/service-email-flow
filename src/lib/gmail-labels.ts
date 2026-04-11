@@ -19,6 +19,10 @@ export const STATUS_LABELS: Record<string, string> = {
 // In-memory cache: label name → Gmail label ID
 const labelIdCache = new Map<string, string>();
 
+// Cache for "all ServiceFlow label IDs" (expires after 60s)
+let allLabelIdsCache: { ids: string[]; expiresAt: number } | null = null;
+const ALL_LABELS_TTL_MS = 60_000;
+
 /** Get or create a Gmail label, return its ID (cached) */
 async function ensureLabel(labelName: string): Promise<string | null> {
   if (labelIdCache.has(labelName)) {
@@ -58,15 +62,20 @@ async function ensureLabel(labelName: string): Promise<string | null> {
   return null;
 }
 
-/** Get IDs for all ServiceFlow/* labels (for removal) */
+/** Get IDs for all ServiceFlow/* labels (for removal). Cached for 60s. */
 async function getAllServiceFlowLabelIds(): Promise<string[]> {
+  if (allLabelIdsCache && allLabelIdsCache.expiresAt > Date.now()) {
+    return allLabelIdsCache.ids;
+  }
   try {
     const gmail = getGmail();
     const { data } = await gmail.users.labels.list({ userId: 'me' });
-    return (data.labels || [])
+    const ids = (data.labels || [])
       .filter((l) => l.name?.startsWith(`${LABEL_PREFIX}/`))
       .map((l) => l.id!)
       .filter(Boolean);
+    allLabelIdsCache = { ids, expiresAt: Date.now() + ALL_LABELS_TTL_MS };
+    return ids;
   } catch {
     return [];
   }
@@ -115,4 +124,5 @@ export async function syncMessageLabel(gmailMessageId: string | null, status: st
 /** Clear the label ID cache (useful for testing or after label renames) */
 export function clearLabelCache(): void {
   labelIdCache.clear();
+  allLabelIdsCache = null;
 }
