@@ -126,11 +126,55 @@ ${businessName}
 ${businessPhone}`;
   }
 
-  // Send email
+  // Respect auto_reply setting: draft mode or send immediately.
+  // Customer-facing emails should honor this gate so the admin reviews before sending.
+  const autoReply = await getConfig<boolean>('auto_reply', false);
+
   const gmail = getGmail();
   const sendAs = process.env.GMAIL_SEND_AS || '';
-
   const rawMessage = buildRawEmail({ to: customerEmail, from: sendAs, subject: emailSubject, text: emailBody });
+
+  const followupNumber = (row.followup_count || 0) + 1;
+
+  if (!autoReply) {
+    // Save as Gmail draft + DB draft for dashboard review. Do NOT send SMS either.
+    // Do NOT increment followup_count — wait for admin to approve.
+    const draft = await gmail.users.drafts.create({
+      userId: 'me',
+      requestBody: {
+        message: { raw: rawMessage, threadId: row.gmail_thread_id || undefined },
+      },
+    });
+
+    await supabase
+      .from('email_cases')
+      .update({
+        draft_reply: {
+          type: 'followup',
+          followup_number: followupNumber,
+          subject: emailSubject,
+          body_text: emailBody,
+          body_html: emailBody.replace(/\n/g, '<br>'),
+          to: customerEmail,
+          created_at: new Date().toISOString(),
+        },
+        draft_gmail_id: draft.data.id,
+        notes: (row.notes || '') + ` | Follow-up #${followupNumber} draft saved — pending admin review`,
+      })
+      .eq('id', caseId);
+
+    await logCaseEvent({
+      caseId,
+      eventType: EventType.FOLLOWUP_SENT,
+      summary: `Follow-up #${followupNumber} draft saved for ${maskEmail(customerEmail)} — pending review`,
+      metadata: { followup_number: followupNumber, mode: 'draft' },
+    });
+
+    log.info({ caseId, followupNumber }, 'Follow-up saved as draft for review');
+    return;
+  }
+
+  // Auto-send mode: send email immediately
   await gmail.users.messages.send({ userId: 'me', requestBody: { raw: rawMessage } });
 
   // Send SMS if phone available
@@ -138,13 +182,13 @@ ${businessPhone}`;
     await sendFollowupSms(row, businessName, businessPhone, calcomUrl);
   }
 
-  // Update case
+  // Update case (only when actually sent)
   const { error: updateError } = await supabase
     .from('email_cases')
     .update({
-      followup_count: (row.followup_count || 0) + 1,
+      followup_count: followupNumber,
       last_followup_at: new Date().toISOString(),
-      notes: (row.notes || '') + ` | Follow-up #${(row.followup_count || 0) + 1} sent`,
+      notes: (row.notes || '') + ` | Follow-up #${followupNumber} sent`,
     })
     .eq('id', caseId);
 
@@ -155,11 +199,11 @@ ${businessPhone}`;
   await logCaseEvent({
     caseId,
     eventType: EventType.FOLLOWUP_SENT,
-    summary: `Follow-up #${(row.followup_count || 0) + 1} sent to ${maskEmail(customerEmail)}`,
-    metadata: { followup_number: (row.followup_count || 0) + 1, has_sms: !!row.customer_phone },
+    summary: `Follow-up #${followupNumber} sent to ${maskEmail(customerEmail)}`,
+    metadata: { followup_number: followupNumber, has_sms: !!row.customer_phone, mode: 'sent' },
   });
 
-  log.info({ caseId, followup: (row.followup_count || 0) + 1 }, 'Follow-up sent');
+  log.info({ caseId, followup: followupNumber }, 'Follow-up sent');
 }
 
 /** Escalate cases that have exhausted follow-ups to NEEDS_MANUAL_CALL */

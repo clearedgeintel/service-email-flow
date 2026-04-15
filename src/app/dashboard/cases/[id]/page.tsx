@@ -51,6 +51,8 @@ interface CaseDetail {
     to: string;
     created_at: string;
     used_fallback?: boolean;
+    type?: 'reply' | 'followup';
+    followup_number?: number;
   } | null;
 }
 
@@ -148,7 +150,11 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-amber-700" />
-                  <h2 className="font-semibold text-amber-900">Pending Draft Reply</h2>
+                  <h2 className="font-semibold text-amber-900">
+                    {c.draft_reply.type === 'followup'
+                      ? `Pending Follow-up #${c.draft_reply.followup_number || '?'}`
+                      : 'Pending Draft Reply'}
+                  </h2>
                   {c.draft_reply.used_fallback && (
                     <span className="text-xs bg-amber-200 text-amber-900 px-2 py-0.5 rounded">Template fallback</span>
                   )}
