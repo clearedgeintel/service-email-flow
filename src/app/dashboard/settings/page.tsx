@@ -109,7 +109,16 @@ export default function SettingsPage() {
     setSaving(true);
     const body: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(settings)) {
-      // Try to parse numbers
+      // Coerce booleans ('true'/'false' from toggle state) to real booleans
+      if (v === 'true') {
+        body[k] = true;
+        continue;
+      }
+      if (v === 'false') {
+        body[k] = false;
+        continue;
+      }
+      // Coerce numbers for number-type fields
       const num = parseFloat(v);
       body[k] = !isNaN(num) && SETTING_GROUPS.some(g => g.fields.some(f => f.key === k && f.type === 'number'))
         ? num

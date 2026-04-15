@@ -128,7 +128,9 @@ ${businessPhone}`;
 
   // Respect auto_reply setting: draft mode or send immediately.
   // Customer-facing emails should honor this gate so the admin reviews before sending.
-  const autoReply = await getConfig<boolean>('auto_reply', false);
+  // Coerce defensively — settings JSONB may store 'true'/'false' as strings.
+  const autoReplyRaw = await getConfig<unknown>('auto_reply', false);
+  const autoReply = autoReplyRaw === true || autoReplyRaw === 'true';
 
   const gmail = getGmail();
   const sendAs = process.env.GMAIL_SEND_AS || '';

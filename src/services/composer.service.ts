@@ -116,8 +116,11 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     return;
   }
 
-  // Determine send mode: auto-send emergencies, otherwise check setting
-  const autoReply = await getConfig<boolean>('auto_reply', false);
+  // Determine send mode: auto-send emergencies, otherwise check setting.
+  // Coerce defensively — the settings JSONB column may store 'true'/'false' as
+  // strings from the UI toggle, which are both truthy in JS.
+  const autoReplyRaw = await getConfig<unknown>('auto_reply', false);
+  const autoReply = autoReplyRaw === true || autoReplyRaw === 'true';
   const shouldSendNow = isEmergency || autoReply;
 
   const gmail = getGmail();
