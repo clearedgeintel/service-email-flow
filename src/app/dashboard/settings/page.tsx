@@ -61,7 +61,20 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<'config' | 'pricing'>('config');
+  const [tab, setTab] = useState<'config' | 'pricing' | 'templates'>('config');
+  const [templates, setTemplates] = useState<Array<{
+    key: string;
+    label: string;
+    description: string | null;
+    subject: string | null;
+    body: string;
+    body_format: string;
+    variables: string[];
+    updated_at: string;
+  }>>([]);
+  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
+  const [templateDrafts, setTemplateDrafts] = useState<Record<string, { subject: string; body: string }>>({});
+  const [templateSaving, setTemplateSaving] = useState<string | null>(null);
   const [resyncing, setResyncing] = useState(false);
   const [resyncResult, setResyncResult] = useState<string | null>(null);
 
@@ -91,7 +104,8 @@ export default function SettingsPage() {
         return r.json();
       }),
       fetch('/api/pricing').then((r) => r.json()),
-    ]).then(([settingsData, pricingData]) => {
+      fetch('/api/templates').then((r) => r.ok ? r.json() : { templates: [] }),
+    ]).then(([settingsData, pricingData, templatesData]) => {
       if (settingsData) {
         // Flatten JSONB values
         const flat: Record<string, string> = {};
@@ -101,9 +115,49 @@ export default function SettingsPage() {
         setSettings(flat);
       }
       setPricing(pricingData?.items || []);
+      setTemplates(templatesData?.templates || []);
       setLoading(false);
     });
   }, [router]);
+
+  const saveTemplate = async (key: string) => {
+    const draft = templateDrafts[key];
+    if (!draft) return;
+    setTemplateSaving(key);
+    try {
+      const res = await fetch(`/api/templates/${key}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: draft.subject || null, body: draft.body }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates((prev) => prev.map((t) => (t.key === key ? data.template : t)));
+        setEditingTemplate(null);
+        setTemplateDrafts((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }
+    } finally {
+      setTemplateSaving(null);
+    }
+  };
+
+  const startEditingTemplate = (key: string, subject: string | null, body: string) => {
+    setEditingTemplate(key);
+    setTemplateDrafts({ ...templateDrafts, [key]: { subject: subject || '', body } });
+  };
+
+  const cancelEditingTemplate = (key: string) => {
+    setEditingTemplate(null);
+    setTemplateDrafts((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
 
   const saveSettings = async () => {
     setSaving(true);
@@ -187,7 +241,121 @@ export default function SettingsPage() {
         >
           Pricing Table
         </button>
+        <button
+          onClick={() => setTab('templates')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'templates' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Email Templates
+        </button>
       </div>
+
+      {tab === 'templates' && (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+            <p className="font-medium mb-1">How templates work</p>
+            <p className="text-blue-800">
+              These templates control the AI reply prompt, follow-up emails, and fallback replies.
+              Use <code className="bg-blue-100 px-1 rounded text-xs">{'{{variable_name}}'}</code> syntax
+              to insert dynamic values (customer name, business info, etc). Changes take effect within 60 seconds.
+            </p>
+          </div>
+
+          {templates.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500 text-sm">
+              No templates found. Run migration 010 in Supabase to seed defaults.
+            </div>
+          ) : (
+            templates.map((t) => {
+              const isEditing = editingTemplate === t.key;
+              const draft = templateDrafts[t.key];
+              return (
+                <div key={t.key} className="bg-white border border-gray-200 rounded-xl p-5">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{t.label}</h3>
+                      {t.description && (
+                        <p className="text-xs text-gray-500 mt-1">{t.description}</p>
+                      )}
+                    </div>
+                    {!isEditing && (
+                      <button
+                        onClick={() => startEditingTemplate(t.key, t.subject, t.body)}
+                        className="ml-2 px-3 py-1.5 text-xs border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+
+                  {t.variables.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {t.variables.map((v) => (
+                        <code key={v} className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-xs font-mono">
+                          {'{{' + v + '}}'}
+                        </code>
+                      ))}
+                    </div>
+                  )}
+
+                  {isEditing && draft ? (
+                    <div className="space-y-3">
+                      {t.subject !== null && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
+                          <input
+                            type="text"
+                            value={draft.subject}
+                            onChange={(e) => setTemplateDrafts({ ...templateDrafts, [t.key]: { ...draft, subject: e.target.value } })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-[#185FA5] outline-none"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Body {t.body_format === 'system_prompt' ? '(LLM system prompt)' : ''}
+                        </label>
+                        <textarea
+                          value={draft.body}
+                          onChange={(e) => setTemplateDrafts({ ...templateDrafts, [t.key]: { ...draft, body: e.target.value } })}
+                          rows={12}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 font-mono focus:ring-2 focus:ring-[#185FA5] outline-none"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => saveTemplate(t.key)}
+                          disabled={templateSaving === t.key}
+                          className="px-4 py-2 bg-[#185FA5] text-white rounded-lg text-sm font-medium hover:bg-[#0C447C] disabled:opacity-50"
+                        >
+                          {templateSaving === t.key ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => cancelEditingTemplate(t.key)}
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {t.subject && (
+                        <div>
+                          <span className="text-xs font-medium text-gray-500">Subject: </span>
+                          <span className="text-xs text-gray-700">{t.subject}</span>
+                        </div>
+                      )}
+                      <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-800 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
+                        {t.body}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {tab === 'config' && (
         <div className="space-y-6">

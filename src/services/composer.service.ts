@@ -70,7 +70,7 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
   const { result: replyText, usedFallback } = await withCircuitBreaker(
     { name: 'openai-composer', failureThreshold: 3, resetTimeout: 60_000 },
     () => generateReplyText(replyParams),
-    () => Promise.resolve(generateFallbackReply(replyParams)),
+    () => generateFallbackReply(replyParams),
   );
 
   if (usedFallback) {
@@ -271,7 +271,11 @@ Add this disclaimer after pricing: "Final pricing is always determined after an 
   context += `\nInclude a call-to-action for booking: "${calcomLabel}" at ${calcomUrl}`;
   context += `\nAlso offer calling at ${businessPhone} as an alternative.\n`;
 
-  const systemPrompt = `You are writing a customer reply email on behalf of "${businessName}".
+  // Load admin-editable system prompt template; fall back to baked-in default
+  // if the template table isn't present or the row was deleted.
+  const { renderTemplateByKey } = await import('@/services/template.service');
+  const rendered = await renderTemplateByKey('composer_system_prompt', { business_name: businessName });
+  const systemPrompt = rendered?.body ?? `You are writing a customer reply email on behalf of "${businessName}".
 
 RULES:
 - Be polite, professional, warm, and concise.
@@ -326,8 +330,8 @@ Write the reply paragraphs now. Plain text only, no formatting, no signature.`;
     .trim();
 }
 
-/** Template-based fallback when OpenAI is unavailable */
-function generateFallbackReply(params: {
+/** Template-based fallback when LLM is unavailable. Uses DB template if available. */
+async function generateFallbackReply(params: {
   row: Record<string, unknown>;
   businessName: string;
   businessPhone: string;
@@ -335,10 +339,22 @@ function generateFallbackReply(params: {
   calcomLabel: string;
   pricingInfo: string | null;
   isEmergency: boolean;
-}): string {
+}): Promise<string> {
   const { row, businessName, businessPhone, isEmergency } = params;
   const name = (row.customer_name as string) || 'there';
+  const summary = (row.problem_summary as string) || 'your inquiry';
 
+  const { renderTemplateByKey } = await import('@/services/template.service');
+  const key = isEmergency ? 'fallback_reply_emergency' : 'fallback_reply_standard';
+  const rendered = await renderTemplateByKey(key, {
+    customer_name: name,
+    business_name: businessName,
+    business_phone: businessPhone,
+    problem_summary: summary,
+  });
+  if (rendered) return rendered.body;
+
+  // Hardcoded fallback if template is missing
   if (isEmergency) {
     return `Hi ${name},
 
@@ -350,8 +366,6 @@ A technician from ${businessName} will contact you within 15 minutes. You can al
 
 Click the button below to confirm your emergency appointment.`;
   }
-
-  const summary = (row.problem_summary as string) || 'your inquiry';
 
   return `Hi ${name},
 

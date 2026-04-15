@@ -147,8 +147,11 @@ Core workflow that predates this roadmap:
 
 ### 5.2 Templates
 - [x] Fallback templates when LLM is unavailable (Phase 3 circuit breaker)
-- [ ] Versioned HTML email templates (stored in DB, editable via dashboard)
-- [ ] Template preview in admin dashboard
+- [x] DB-stored email templates (migration 010) with `{{var}}` substitution
+  for LLM system prompt, follow-ups, and fallback replies
+- [x] Template editor in Settings → Email Templates tab (view, edit, save per template)
+- [ ] Version history for templates (rollback to prior versions)
+- [ ] Live preview with sample variable values
 
 ### 5.3 Multi-Channel
 - [ ] WhatsApp Business API integration for customer replies

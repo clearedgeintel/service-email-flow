@@ -91,14 +91,34 @@ export async function sendFollowup(caseId: number): Promise<void> {
     calcomUrl = await getConfig<string>('calcom_service_url', 'https://cal.com/profix/service-call');
   }
 
+  // Load follow-up template from DB (admin-editable). Fall back to baked-in
+  // defaults if missing.
+  const { renderTemplateByKey } = await import('@/services/template.service');
+  const templateKey = isFirst ? 'followup_first' : 'followup_second';
+  const vars = {
+    customer_name: row.customer_name || 'there',
+    business_name: businessName,
+    business_phone: businessPhone,
+    trade: row.trade || 'service',
+    problem_summary: ((row.problem_summary as string) || 'your service need').substring(0, 100),
+    calcom_url: calcomUrl,
+  };
+  const rendered = await renderTemplateByKey(templateKey, vars);
+
   let emailSubject: string;
   let emailBody: string;
 
-  if (isFirst) {
-    emailSubject = `Following up on your ${row.trade || 'service'} request — ${businessName}`;
-    emailBody = `Hi ${row.customer_name || 'there'},
+  if (rendered) {
+    emailSubject = rendered.subject ||
+      (isFirst
+        ? `Following up on your ${vars.trade} request — ${businessName}`
+        : `One more follow-up — ${businessName}`);
+    emailBody = rendered.body;
+  } else if (isFirst) {
+    emailSubject = `Following up on your ${vars.trade} request — ${businessName}`;
+    emailBody = `Hi ${vars.customer_name},
 
-Just checking in! We received your request about ${(row.problem_summary || 'your service need').substring(0, 100)} and wanted to make sure you were able to book an appointment.
+Just checking in! We received your request about ${vars.problem_summary} and wanted to make sure you were able to book an appointment.
 
 You can schedule at your convenience here:
 ${calcomUrl}
@@ -112,9 +132,9 @@ ${businessName}
 ${businessPhone}`;
   } else {
     emailSubject = `One more follow-up — ${businessName}`;
-    emailBody = `Hi ${row.customer_name || 'there'},
+    emailBody = `Hi ${vars.customer_name},
 
-We wanted to follow up one more time on your ${row.trade || 'service'} request. We'd love to help!
+We wanted to follow up one more time on your ${vars.trade} request. We'd love to help!
 
 Book here: ${calcomUrl}
 Or call us: ${businessPhone}
