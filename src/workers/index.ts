@@ -15,7 +15,7 @@ import { startErrorAlertWorker } from './error-alert.worker';
 const workers: Array<{ close: () => Promise<void> }> = [];
 
 async function main() {
-  logger.info('Starting ServiceFlow workers...');
+  logger.info('Starting ClearDesk workers...');
 
   // Set up repeatable (cron) jobs
   await setupRepeatableJobs();

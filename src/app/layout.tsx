@@ -13,15 +13,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ServiceFlow — Email Automation Dashboard",
-  description: "Admin dashboard for ServiceFlow email automation",
+  title: "ClearDesk — AI Email Automation",
+  description: "ClearDesk by ClearEdge Intelligence — AI-powered email automation for service businesses",
+  icons: {
+    icon: "/cleardesk_logo_blue.svg",
+  },
 };
 
 // Inline script to apply theme before hydration (no flash of wrong theme)
 const themeInitScript = `
 (function() {
   try {
-    var theme = localStorage.getItem('serviceflow:theme');
+    var theme = localStorage.getItem('cleardesk:theme') || localStorage.getItem('serviceflow:theme');
     if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
       document.documentElement.classList.add('dark');
     }

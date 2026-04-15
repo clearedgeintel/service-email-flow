@@ -27,7 +27,7 @@ function createMockGmail(existingLabels: Array<{ id: string; name: string }> = [
     users: {
       labels: {
         list: vi.fn().mockResolvedValue({ data: { labels: existingLabels } }),
-        create: vi.fn().mockResolvedValue({ data: { id: 'new-label-id', name: 'ServiceFlow/New' } }),
+        create: vi.fn().mockResolvedValue({ data: { id: 'new-label-id', name: 'ClearDesk/New' } }),
       },
       messages: {
         modify: vi.fn().mockResolvedValue({ data: {} }),
@@ -38,13 +38,13 @@ function createMockGmail(existingLabels: Array<{ id: string; name: string }> = [
 
 describe('STATUS_LABELS', () => {
   it('has a label for every case status', () => {
-    expect(STATUS_LABELS.RECEIVED).toBe('ServiceFlow/Received');
-    expect(STATUS_LABELS.CLASSIFIED).toBe('ServiceFlow/Classified');
-    expect(STATUS_LABELS.RESPONDED_PENDING_BOOKING).toBe('ServiceFlow/Responded');
-    expect(STATUS_LABELS.ESCALATED).toBe('ServiceFlow/Escalated');
-    expect(STATUS_LABELS.NEEDS_REVIEW).toBe('ServiceFlow/Needs Review');
-    expect(STATUS_LABELS.NEEDS_MANUAL_CALL).toBe('ServiceFlow/Needs Manual Call');
-    expect(STATUS_LABELS.CLOSED).toBe('ServiceFlow/Closed');
+    expect(STATUS_LABELS.RECEIVED).toBe('ClearDesk/Received');
+    expect(STATUS_LABELS.CLASSIFIED).toBe('ClearDesk/Classified');
+    expect(STATUS_LABELS.RESPONDED_PENDING_BOOKING).toBe('ClearDesk/Responded');
+    expect(STATUS_LABELS.ESCALATED).toBe('ClearDesk/Escalated');
+    expect(STATUS_LABELS.NEEDS_REVIEW).toBe('ClearDesk/Needs Review');
+    expect(STATUS_LABELS.NEEDS_MANUAL_CALL).toBe('ClearDesk/Needs Manual Call');
+    expect(STATUS_LABELS.CLOSED).toBe('ClearDesk/Closed');
   });
 });
 
@@ -84,7 +84,7 @@ describe('syncMessageLabel', () => {
 
   it('reuses existing label when present', async () => {
     const mock = createMockGmail([
-      { id: 'existing-id', name: 'ServiceFlow/Classified' },
+      { id: 'existing-id', name: 'ClearDesk/Classified' },
     ]);
     mockedGetGmail.mockReturnValue(mock as any);
 
@@ -99,11 +99,12 @@ describe('syncMessageLabel', () => {
     );
   });
 
-  it('removes other ServiceFlow labels when adding new one', async () => {
+  it('removes other brand labels (ClearDesk + legacy ServiceFlow) when adding new one', async () => {
     const mock = createMockGmail([
-      { id: 'received-id', name: 'ServiceFlow/Received' },
-      { id: 'classified-id', name: 'ServiceFlow/Classified' },
-      { id: 'escalated-id', name: 'ServiceFlow/Escalated' },
+      { id: 'received-id', name: 'ClearDesk/Received' },
+      { id: 'classified-id', name: 'ClearDesk/Classified' },
+      { id: 'escalated-id', name: 'ClearDesk/Escalated' },
+      { id: 'legacy-id', name: 'ServiceFlow/Responded' },
       { id: 'unrelated-id', name: 'Important' },
     ]);
     mockedGetGmail.mockReturnValue(mock as any);
@@ -114,6 +115,7 @@ describe('syncMessageLabel', () => {
     expect(modifyCall.requestBody.addLabelIds).toEqual(['classified-id']);
     expect(modifyCall.requestBody.removeLabelIds).toContain('received-id');
     expect(modifyCall.requestBody.removeLabelIds).toContain('escalated-id');
+    expect(modifyCall.requestBody.removeLabelIds).toContain('legacy-id');
     expect(modifyCall.requestBody.removeLabelIds).not.toContain('unrelated-id');
     expect(modifyCall.requestBody.removeLabelIds).not.toContain('classified-id');
   });

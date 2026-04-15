@@ -216,7 +216,7 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={() => setSettings({ ...settings, auto_reply: settings.auto_reply === 'true' ? 'false' : 'true' })}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.auto_reply === 'true' ? 'bg-blue-600' : 'bg-gray-300'}`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.auto_reply === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.auto_reply === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
@@ -229,8 +229,9 @@ export default function SettingsPage() {
               <h2 className="font-semibold text-gray-900">Gmail Labels</h2>
             </div>
             <p className="text-xs text-gray-500 mb-3">
-              Sync ServiceFlow labels to all existing cases in Gmail. New cases are labeled automatically,
-              but this will retroactively apply labels to cases that existed before label sync was added.
+              Sync ClearDesk labels to all existing cases in Gmail. New cases are labeled automatically;
+              this retroactively applies labels to cases that existed before label sync was added
+              (and migrates any legacy ServiceFlow/* labels to ClearDesk/*).
             </p>
             <div className="flex items-center gap-3">
               <button
@@ -251,7 +252,7 @@ export default function SettingsPage() {
           <button
             onClick={saveSettings}
             disabled={saving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-6 py-2.5 bg-[#185FA5] text-white rounded-lg text-sm font-medium hover:bg-[#0C447C] disabled:opacity-50 transition-colors"
           >
             {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Settings'}

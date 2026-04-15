@@ -4,15 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { Inbox, BarChart3, Settings, LogOut, Zap, Menu, X, Mail, Circle, Moon, Sun } from 'lucide-react';
+import { Inbox, BarChart3, Settings, LogOut, Menu, X, Mail, Circle, Moon, Sun } from 'lucide-react';
 
-const THEME_KEY = 'serviceflow:theme';
+const THEME_KEY = 'cleardesk:theme';
 
 function useTheme() {
   const [theme, setThemeState] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
-    const stored = localStorage.getItem(THEME_KEY);
+    const stored = localStorage.getItem(THEME_KEY) || localStorage.getItem('serviceflow:theme');
     const isDark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
     setThemeState(isDark ? 'dark' : 'light');
   }, []);
@@ -31,6 +31,20 @@ const NAV_ITEMS = [
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
+
+/** Compact ClearDesk icon (signal arcs in rounded navy square) */
+function BrandIcon({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 86 86" className={className} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="86" height="86" rx="16" fill="#0C447C" />
+      <path d="M 16,69 Q 43,39 70,69" fill="none" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.28" />
+      <path d="M 24,69 Q 43,50 62,69" fill="none" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.58" />
+      <path d="M 33,69 Q 43,60 53,69" fill="none" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="1" />
+      <circle cx="43" cy="75" r="6.5" fill="#378ADD" opacity="0.4" />
+      <circle cx="43" cy="75" r="4" fill="white" />
+    </svg>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -68,10 +82,10 @@ export function Sidebar() {
   };
 
   const statusIndicator = (
-    <div className="px-4 py-3 border-t border-gray-700">
+    <div className="px-4 py-3 border-t border-white/10">
       <div className="flex items-center gap-2">
-        <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-        <span className="text-xs text-gray-400">Monitoring Inbox</span>
+        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+        <span className="text-xs text-slate-400">Monitoring Inbox</span>
       </div>
       <div className="flex items-center gap-1.5 mt-1.5 ml-[22px]">
         <Circle
@@ -82,11 +96,11 @@ export function Sidebar() {
             systemStatus === 'loading' && 'text-yellow-400 fill-yellow-400',
           )}
         />
-        <span className="text-xs text-gray-300 truncate">
+        <span className="text-xs text-slate-300 truncate">
           {mailbox || 'Not configured'}
         </span>
       </div>
-      <p className="text-[10px] text-gray-500 mt-1 ml-[22px]">
+      <p className="text-[10px] text-slate-500 mt-1 ml-[22px]">
         {systemStatus === 'connected' ? 'System healthy' : systemStatus === 'error' ? 'Connection issue' : 'Checking...'}
       </p>
     </div>
@@ -94,17 +108,21 @@ export function Sidebar() {
 
   const navContent = (
     <>
-      <div className="p-6 border-b border-gray-700">
+      <div className="p-6 border-b border-white/10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="w-6 h-6 text-blue-400" />
-            <h1 className="text-lg font-bold">ServiceFlow</h1>
+          <div className="flex items-center gap-2.5">
+            <BrandIcon className="w-8 h-8 shrink-0" />
+            <div>
+              <h1 className="text-lg font-semibold leading-tight">
+                <span className="text-[#378ADD]">Clear</span><span className="text-white">Desk</span>
+              </h1>
+              <p className="text-[10px] text-slate-400 tracking-wider uppercase mt-0.5">by ClearEdge</p>
+            </div>
           </div>
-          <button onClick={() => setOpen(false)} className="md:hidden p-1 text-gray-400 hover:text-white">
+          <button onClick={() => setOpen(false)} className="md:hidden p-1 text-slate-400 hover:text-white">
             <X className="w-5 h-5" />
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-1">Email Automation Dashboard</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
@@ -122,8 +140,8 @@ export function Sidebar() {
               className={clsx(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
                 isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white',
+                  ? 'bg-[#185FA5] text-white'
+                  : 'text-slate-300 hover:bg-white/5 hover:text-white',
               )}
             >
               <item.icon className="w-4 h-4" />
@@ -135,17 +153,17 @@ export function Sidebar() {
 
       {statusIndicator}
 
-      <div className="p-4 border-t border-gray-700 space-y-1">
+      <div className="p-4 border-t border-white/10 space-y-1">
         <button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white w-full transition-colors"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full transition-colors"
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
         </button>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white w-full transition-colors"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-white/5 hover:text-white w-full transition-colors"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
@@ -157,10 +175,12 @@ export function Sidebar() {
   return (
     <>
       {/* Mobile header bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-gray-900 text-white flex items-center justify-between px-4 py-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-[#0B1A2E] text-white flex items-center justify-between px-4 py-3 border-b border-white/10">
         <div className="flex items-center gap-2">
-          <Zap className="w-5 h-5 text-blue-400" />
-          <span className="font-bold">ServiceFlow</span>
+          <BrandIcon className="w-6 h-6" />
+          <span className="font-semibold">
+            <span className="text-[#378ADD]">Clear</span>Desk
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
@@ -172,9 +192,9 @@ export function Sidebar() {
                 systemStatus === 'loading' && 'text-yellow-400 fill-yellow-400',
               )}
             />
-            <span className="text-xs text-gray-400 max-w-[120px] truncate">{mailbox || '—'}</span>
+            <span className="text-xs text-slate-400 max-w-[120px] truncate">{mailbox || '—'}</span>
           </div>
-          <button onClick={() => setOpen(true)} className="p-1.5 rounded-lg hover:bg-gray-800">
+          <button onClick={() => setOpen(true)} className="p-1.5 rounded-lg hover:bg-white/5">
             <Menu className="w-5 h-5" />
           </button>
         </div>
@@ -184,14 +204,14 @@ export function Sidebar() {
       {open && (
         <div className="md:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-gray-900 text-white flex flex-col">
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-[#0B1A2E] text-white flex flex-col">
             {navContent}
           </aside>
         </div>
       )}
 
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-64 bg-gray-900 text-white flex-col h-screen sticky top-0">
+      {/* Desktop sidebar — deep navy with subtle gradient */}
+      <aside className="hidden md:flex w-64 bg-gradient-to-b from-[#0B1A2E] via-[#0C447C]/20 to-[#0B1A2E] text-white flex-col h-screen sticky top-0">
         {navContent}
       </aside>
     </>

@@ -234,7 +234,7 @@ function CaseQueueContent() {
           </button>
           <button
             onClick={() => fetchCases()}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-[#185FA5] text-white rounded-lg hover:bg-[#0C447C] transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             <span className="hidden sm:inline">Refresh</span>

@@ -3,7 +3,9 @@ import { createChildLogger } from './logger';
 
 const log = createChildLogger('gmail-labels');
 
-const LABEL_PREFIX = 'ServiceFlow';
+const LABEL_PREFIX = 'ClearDesk';
+// Legacy prefix: removed from messages on sync so existing customers migrate cleanly
+const LEGACY_LABEL_PREFIXES = ['ServiceFlow'];
 
 /** Map case status to Gmail label name */
 export const STATUS_LABELS: Record<string, string> = {
@@ -19,7 +21,7 @@ export const STATUS_LABELS: Record<string, string> = {
 // In-memory cache: label name → Gmail label ID
 const labelIdCache = new Map<string, string>();
 
-// Cache for "all ServiceFlow label IDs" (expires after 60s)
+// Cache for "all brand label IDs" (expires after 60s)
 let allLabelIdsCache: { ids: string[]; expiresAt: number } | null = null;
 const ALL_LABELS_TTL_MS = 60_000;
 
@@ -62,16 +64,17 @@ async function ensureLabel(labelName: string): Promise<string | null> {
   return null;
 }
 
-/** Get IDs for all ServiceFlow/* labels (for removal). Cached for 60s. */
-async function getAllServiceFlowLabelIds(): Promise<string[]> {
+/** Get IDs for all ClearDesk/* and legacy ServiceFlow/* labels (for removal on sync). Cached for 60s. */
+async function getAllBrandLabelIds(): Promise<string[]> {
   if (allLabelIdsCache && allLabelIdsCache.expiresAt > Date.now()) {
     return allLabelIdsCache.ids;
   }
   try {
     const gmail = getGmail();
     const { data } = await gmail.users.labels.list({ userId: 'me' });
+    const prefixes = [LABEL_PREFIX, ...LEGACY_LABEL_PREFIXES];
     const ids = (data.labels || [])
-      .filter((l) => l.name?.startsWith(`${LABEL_PREFIX}/`))
+      .filter((l) => prefixes.some((p) => l.name?.startsWith(`${p}/`)))
       .map((l) => l.id!)
       .filter(Boolean);
     allLabelIdsCache = { ids, expiresAt: Date.now() + ALL_LABELS_TTL_MS };
@@ -83,7 +86,7 @@ async function getAllServiceFlowLabelIds(): Promise<string[]> {
 
 /**
  * Sync a Gmail message's label to match the current case status.
- * Removes all ServiceFlow/* labels and adds the one matching the status.
+ * Removes all ClearDesk/* (and legacy ServiceFlow/*) labels and adds the one matching the status.
  * Silently no-ops if messageId is missing or Gmail API fails.
  */
 export async function syncMessageLabel(gmailMessageId: string | null, status: string): Promise<void> {
@@ -98,7 +101,7 @@ export async function syncMessageLabel(gmailMessageId: string | null, status: st
   try {
     const [targetLabelId, allLabelIds] = await Promise.all([
       ensureLabel(targetLabel),
-      getAllServiceFlowLabelIds(),
+      getAllBrandLabelIds(),
     ]);
 
     if (!targetLabelId) return;
