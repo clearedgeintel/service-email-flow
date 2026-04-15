@@ -1,6 +1,34 @@
 # ServiceFlow — Development Roadmap
 
-> Current state: feature-complete MVP with full intake-classify-route-reply-notify-follow-up pipeline, admin dashboard, and Docker deployment. This roadmap outlines suggested improvements organized by priority.
+> Current state: production-ready single-tenant MVP with full intake-classify-route-reply-notify-follow-up pipeline, admin dashboard, Cal.com booking integration, Gmail label sync, draft approval workflow, and Railway deployment config.
+
+## Status Snapshot (as of 2026-04)
+
+- **166 tests passing across 25 test files** (unit + integration)
+- **8 database migrations** applied
+- **LLM:** Anthropic Claude Sonnet 4 (migrated from OpenAI)
+- **Deployed:** Railway (Dockerfile + railway.toml)
+- **Phases complete:** 1, 2, 3, 4, 5, 6, 8.1, 8.4, plus Cal.com from 8.5
+
+---
+
+## Phase 0: Core Pipeline (shipped from day 1)
+
+Core workflow that predates this roadmap:
+
+- [x] Gmail intake worker (polls every 2 min, deduplicates by `gmail_message_id`)
+- [x] AI classifier worker (Anthropic Claude, extracts intent, urgency, trade, customer info, sentiment)
+- [x] Router worker (intent + confidence → status transition)
+- [x] Composer worker (LLM-generated HTML reply, pricing table lookup, CTA selection)
+- [x] Notifier worker (tech SMS via Twilio + email via Gmail API)
+- [x] Followup worker (configurable delays, escalation on max attempts)
+- [x] Digest worker (daily ops summary email + Slack)
+- [x] Error alert worker (Slack + email on job failures)
+- [x] Analytics dashboard (`/dashboard/analytics`) — case volume, response time, intent/urgency/trade breakdowns, stuck items
+- [x] Settings dashboard (`/dashboard/settings`) — business info, tech contact, booking links, automation settings, pricing CRUD
+- [x] Jobs API (`/api/jobs`) — queue health and manual job triggering
+- [x] Case action endpoints: add-note, reclassify, resend-reply, escalate, close, trigger-followup, feedback, approve-reply, discard-reply
+- [x] BullMQ + Redis (Upstash) job queue with retries and exponential backoff
 
 ---
 
@@ -8,14 +36,14 @@
 
 ### 1.1 Test Infrastructure
 - [x] Set up Vitest with TypeScript support and native tsconfig path resolution
-- [x] Reusable mock factories for Supabase, OpenAI, and Gmail (`src/test/mocks.ts`)
+- [x] Reusable mock factories for Supabase, Anthropic, and Gmail (`src/test/mocks.ts`)
 - [x] API test helpers for NextRequest/NextResponse (`src/test/api-helpers.ts`)
 - [x] Add CI pipeline (GitHub Actions) for lint + type-check + test on every push/PR
 
-### 1.2 Unit Tests (73 tests passing)
-- [x] Service layer tests: classifier, router, pricing, case-event
-- [x] Utility/lib tests: auth, config, gmail helpers, email templates
-- [x] Zod schema validation tests (ClassificationSchema)
+### 1.2 Unit Tests (166 tests across 25 files)
+- [x] Service layer tests: classifier, router, pricing, case-event, smart, retention, calcom
+- [x] Utility/lib tests: auth, config, gmail, gmail-labels, email-builder, email-template, circuit-breaker, logger, rate-limit, sanitize, validation
+- [x] Zod schema validation tests (ClassificationSchema + all API route schemas)
 
 ### 1.3 Integration Tests
 - [x] API route tests: login, health, cases (auth guard, filtering, pagination)
@@ -60,8 +88,8 @@
 ## Phase 3: Resilience & Error Handling (P1) — COMPLETE
 
 ### 3.1 External API Resilience
-- [x] Circuit breaker for OpenAI calls (fallback to template-based replies when down)
-- [x] Configurable timeouts on OpenAI (30s timeout, 2 SDK retries)
+- [x] Circuit breaker for LLM calls (Anthropic Claude Sonnet 4, fallback to template-based replies when down)
+- [x] Configurable timeouts on LLM (30s timeout, 2 SDK retries)
 - [x] Slack retry logic (2 retries with 2s delay, skip retry on 4xx)
 - [ ] SMTP fallback when Gmail API fails
 
@@ -73,7 +101,7 @@
 
 ### 3.3 Graceful Degradation
 - [x] If classification fails after all retries, route to NEEDS_REVIEW (not stuck at RECEIVED)
-- [x] If OpenAI is down, composer uses template-based fallback reply
+- [x] If LLM is down, composer uses template-based fallback reply
 - [x] Existing: pricing lookup returns empty array on failure (reply sent without pricing)
 - [x] Existing: Slack failures are non-blocking (fire-and-forget)
 
@@ -239,16 +267,62 @@
 
 ---
 
+## Phase 10: Voice Agents & Workflow Automation (P2)
+
+> Post-launch expansion: plug ServiceFlow into voice AI and low-code workflow automation to extend the pipeline beyond email.
+
+### 10.1 Retell AI Voice Agent
+- [ ] Retell AI account setup, API key, `CALL_WEBHOOK_SECRET` env var
+- [ ] DB migration: `calls` table (case_id, retell_call_id, direction, status, started_at, ended_at, duration_seconds, transcript, recording_url)
+- [ ] Inbound call handler — Twilio number forwards to Retell agent that collects caller info (name, problem, address, urgency) and creates a new case via API
+- [ ] Outbound callback — trigger a Retell call for cases where clarification is needed (admin button or automated on low-confidence cases)
+- [ ] Webhook route `/api/webhooks/retell` (signature-verified) for `call_started`, `call_ended`, `call_analyzed`
+- [ ] Link calls to existing cases by phone number lookup, fall back to creating new case
+- [ ] Store transcript as structured case event with speaker-labeled turns
+- [ ] After-hours fallback: configured in Settings, missed calls route to voice agent
+- [ ] Dashboard: call history panel on case detail showing transcript + recording link
+- [ ] Voice agent uses same business info/pricing/booking URLs as email pipeline (shared settings)
+
+### 10.2 n8n Workflow Integration
+- [ ] Generic webhook emission system in ServiceFlow (subscribable per event type)
+- [ ] Case event webhooks: `case.created`, `case.classified`, `case.escalated`, `case.replied`, `case.booked`, `case.closed`
+- [ ] Webhook config table: URL, secret, enabled event types, retry policy
+- [ ] HMAC-SHA256 signature on outgoing webhooks so n8n can verify
+- [ ] Settings page: "Integrations" tab to add/test/disable webhook subscriptions
+- [ ] Pre-built n8n workflow templates in `docs/n8n-templates/`:
+  - New case → Slack notification + HubSpot contact sync
+  - Booking confirmed → Google Calendar event + SMS confirmation to tech
+  - Case closed → customer satisfaction survey + QuickBooks invoice draft
+  - Emergency → PagerDuty + phone call to on-call tech
+- [ ] Incoming n8n callback API: `POST /api/n8n/action` lets n8n trigger ServiceFlow actions (close case, add note, escalate) with API key auth
+- [ ] Documentation: `docs/N8N_SETUP.md` with self-host or cloud setup, example workflows
+
+### 10.3 Combined Voice + Email + Workflow Scenarios
+- [ ] Voice → Email → Booking: inbound call creates case, email pipeline sends confirmation with Cal.com link
+- [ ] Email → Callback: unclear/low-confidence email triggers Retell agent to call customer for clarification
+- [ ] Emergency escalation chain: emergency email → tech SMS → if no response in 5min → Retell outbound call → if still unreached → PagerDuty via n8n
+- [ ] Unified timeline: case detail page shows email + voice + n8n-triggered events in one chronological view
+- [ ] Channel preference: customer setting (stored per email) for preferred communication channel
+
+### 10.4 Voice Analytics
+- [ ] Call duration, hold time, resolution rate metrics
+- [ ] Call transcript sentiment analysis (re-use existing sentiment classifier)
+- [ ] Cost tracking (Retell + Twilio minutes used)
+
+---
+
 ## Summary
 
 | Phase | Focus | Priority | Estimated Scope |
 |-------|-------|----------|-----------------|
-| 1 | Testing & Reliability | P0 | **COMPLETE** — 73 tests, CI pipeline |
+| 0 | Core Pipeline | — | **COMPLETE** — 8 workers, analytics, settings, case actions |
+| 1 | Testing & Reliability | P0 | **COMPLETE** — 166 tests, CI pipeline |
 | 2 | Security Hardening | P0 | **COMPLETE** — rate limiting, Zod validation, CSP headers, sanitization |
 | 3 | Resilience & Error Handling | P1 | **COMPLETE** — circuit breaker, timeouts, idempotency, fallbacks |
 | 4 | Monitoring & Observability | P1 | **COMPLETE** — metrics endpoint, PII masking, correlation IDs, queue health |
 | 5 | Email & Communication | P1 | **COMPLETE** — shared email builder, List-Unsubscribe, plain-text fallback |
 | 6 | Data & Privacy | P2 | **COMPLETE** — GDPR export/forget, retention, session cleanup |
 | 7 | Scaling & Performance | P2 | Pooling, caching, horizontal scale |
-| 8 | Feature Enhancements | P2 | Bulk ops, customer portal, integrations |
+| 8 | Feature Enhancements | P2 | 8.1 dashboard COMPLETE, 8.4 smart features COMPLETE, Cal.com integration from 8.5 COMPLETE; remaining: customer portal, multi-tenant, integrations |
 | 9 | Documentation & DevEx | P3 | API spec, runbooks, dev tooling |
+| 10 | Voice Agents & Workflow Automation | P2 | **NEW** — Retell AI inbound/outbound calls, n8n workflow integration, emergency escalation chains |
