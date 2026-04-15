@@ -39,6 +39,8 @@ USER worker
 CMD ["npx", "tsx", "--tsconfig", "tsconfig.json", "src/workers/index.ts"]
 
 # --- App (Next.js) — LAST STAGE is the default target for Railway/Docker ---
+# This stage also includes tsconfig.json and the full dev-tooling so that
+# Railway can override the start command to run the worker from the same image.
 FROM base AS app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && \
@@ -49,7 +51,13 @@ COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/next.config.ts ./next.config.ts
+COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/src ./src
+
+# Install tsx so this image can also run the worker via a custom start command.
+# Keeps Railway simple: one image, choose via Custom Start Command which process
+# to run (npm start for web, npx tsx src/workers/index.ts for worker).
+RUN npm install --no-save tsx
 
 USER nextjs
 EXPOSE 3000
