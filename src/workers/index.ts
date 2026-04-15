@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
+import { createServer } from 'http';
 import { setupRepeatableJobs } from '@/lib/queue';
 import { logger } from '@/lib/logger';
 import { startGmailIntakeWorker } from './gmail-intake.worker';
@@ -13,6 +14,7 @@ import { startDigestWorker } from './digest.worker';
 import { startErrorAlertWorker } from './error-alert.worker';
 
 const workers: Array<{ close: () => Promise<void> }> = [];
+const startedAt = new Date().toISOString();
 
 async function main() {
   logger.info('Starting ClearDesk workers...');
@@ -32,6 +34,28 @@ async function main() {
   workers.push(startErrorAlertWorker());
 
   logger.info(`All workers started (${workers.length} active)`);
+
+  // Tiny HTTP server so Railway/k8s healthchecks pass. The worker has no
+  // public surface — only /api/health responds.
+  const port = parseInt(process.env.PORT || '8080');
+  const server = createServer((req, res) => {
+    if (req.url === '/api/health' || req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        status: 'ok',
+        role: 'worker',
+        workers_active: workers.length,
+        started_at: startedAt,
+        uptime_seconds: Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000),
+      }));
+      return;
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  });
+  server.listen(port, () => {
+    logger.info({ port }, 'Worker health endpoint listening');
+  });
 }
 
 // Graceful shutdown
