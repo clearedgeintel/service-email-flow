@@ -52,33 +52,47 @@ export function Sidebar() {
   const [open, setOpen] = useState(false);
   const [mailbox, setMailbox] = useState<string>('');
   const [systemStatus, setSystemStatus] = useState<'loading' | 'connected' | 'error'>('loading');
+  const [workerStatus, setWorkerStatus] = useState<'running' | 'stale' | 'unknown'>('unknown');
+  const [lastPoll, setLastPoll] = useState<{
+    started_at: string;
+    messages_found: number;
+    cases_inserted: number;
+    error: string | null;
+  } | null>(null);
   const { theme, setTheme } = useTheme();
 
-  useEffect(() => {
+  const refreshStatus = () => {
     fetch('/api/mailbox-status')
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data) {
           setMailbox(data.mailbox || '');
           setSystemStatus(data.healthy ? 'connected' : 'error');
+          setWorkerStatus(data.worker_status || 'unknown');
+          setLastPoll(data.last_poll || null);
         }
       })
       .catch(() => setSystemStatus('error'));
+  };
 
-    const interval = setInterval(() => {
-      fetch('/api/mailbox-status')
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          if (data) setSystemStatus(data.healthy ? 'connected' : 'error');
-        })
-        .catch(() => setSystemStatus('error'));
-    }, 60_000);
+  useEffect(() => {
+    refreshStatus();
+    const interval = setInterval(refreshStatus, 30_000);
     return () => clearInterval(interval);
   }, []);
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
+  };
+
+  const formatAgo = (iso: string | undefined | null) => {
+    if (!iso) return 'never';
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
   };
 
   const statusIndicator = (
@@ -91,7 +105,9 @@ export function Sidebar() {
         <Circle
           className={clsx(
             'w-2 h-2 shrink-0',
-            systemStatus === 'connected' && 'text-green-400 fill-green-400',
+            systemStatus === 'connected' && workerStatus === 'running' && 'text-green-400 fill-green-400',
+            systemStatus === 'connected' && workerStatus === 'stale' && 'text-yellow-400 fill-yellow-400',
+            systemStatus === 'connected' && workerStatus === 'unknown' && 'text-yellow-400 fill-yellow-400',
             systemStatus === 'error' && 'text-red-400 fill-red-400',
             systemStatus === 'loading' && 'text-yellow-400 fill-yellow-400',
           )}
@@ -101,8 +117,24 @@ export function Sidebar() {
         </span>
       </div>
       <p className="text-[10px] text-slate-500 mt-1 ml-[22px]">
-        {systemStatus === 'connected' ? 'System healthy' : systemStatus === 'error' ? 'Connection issue' : 'Checking...'}
+        {systemStatus === 'error'
+          ? 'Connection issue'
+          : workerStatus === 'running'
+            ? `Last poll ${formatAgo(lastPoll?.started_at)}`
+            : workerStatus === 'stale'
+              ? `Worker stale — last poll ${formatAgo(lastPoll?.started_at)}`
+              : 'Worker not running'}
       </p>
+      {lastPoll && !lastPoll.error && workerStatus === 'running' && (
+        <p className="text-[10px] text-slate-500 mt-0.5 ml-[22px]">
+          Found {lastPoll.messages_found} · ingested {lastPoll.cases_inserted}
+        </p>
+      )}
+      {lastPoll?.error && (
+        <p className="text-[10px] text-red-300 mt-0.5 ml-[22px] truncate" title={lastPoll.error}>
+          Error: {lastPoll.error}
+        </p>
+      )}
     </div>
   );
 

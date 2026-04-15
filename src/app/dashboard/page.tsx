@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StatusBadge, UrgencyBadge, IntentBadge } from '@/components/status-badge';
-import { Search, RefreshCw, ChevronLeft, ChevronRight, Filter, Download, Bookmark, X as CloseIcon, AlertTriangle, X as XIcon } from 'lucide-react';
+import { Search, RefreshCw, ChevronLeft, ChevronRight, Filter, Download, Bookmark, X as CloseIcon, AlertTriangle, X as XIcon, Activity, Mail } from 'lucide-react';
 
 interface CaseRow {
   id: number;
@@ -55,6 +55,20 @@ function CaseQueueContent() {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [newFilterName, setNewFilterName] = useState('');
   const [newCasesCount, setNewCasesCount] = useState(0);
+  const [polling, setPolling] = useState(false);
+  const [pollResult, setPollResult] = useState<string | null>(null);
+  const [showPollLog, setShowPollLog] = useState(false);
+  const [pollHistory, setPollHistory] = useState<Array<{
+    id: number;
+    started_at: string;
+    finished_at: string | null;
+    duration_ms: number | null;
+    messages_found: number;
+    cases_inserted: number;
+    error: string | null;
+    metadata: Record<string, unknown> | null;
+  }>>([]);
+  const [pollStats, setPollStats] = useState<{ total_polls: number; messages_found: number; errors: number } | null>(null);
   const lastTotalRef = useRef<number>(0);
 
   const page = parseInt(searchParams.get('page') || '1');
@@ -180,6 +194,53 @@ function CaseQueueContent() {
     window.location.href = `/api/cases/export?${params}`;
   };
 
+  // Load poll history (for the poll log panel)
+  const loadPollHistory = useCallback(async () => {
+    try {
+      const res = await fetch('/api/polls?limit=50');
+      if (res.ok) {
+        const data = await res.json();
+        setPollHistory(data.polls || []);
+        setPollStats(data.stats_24h || null);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showPollLog) {
+      loadPollHistory();
+      const interval = setInterval(loadPollHistory, 15_000);
+      return () => clearInterval(interval);
+    }
+  }, [showPollLog, loadPollHistory]);
+
+  // Poll Gmail now (manual trigger)
+  const pollNow = async () => {
+    setPolling(true);
+    setPollResult(null);
+    try {
+      const res = await fetch('/api/polls/trigger', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setPollResult('Poll queued — watch status indicator and poll log for result');
+        // Refresh history after a delay to catch the result
+        setTimeout(() => {
+          loadPollHistory();
+          fetchCases();
+        }, 4000);
+      } else {
+        setPollResult(`Error: ${data.error || 'poll failed'}`);
+      }
+    } catch (e) {
+      setPollResult(`Error: ${e instanceof Error ? e.message : 'unknown'}`);
+    } finally {
+      setPolling(false);
+      setTimeout(() => setPollResult(null), 8000);
+    }
+  };
+
   // Saved filters
   const saveCurrentFilter = () => {
     if (!newFilterName.trim()) return;
@@ -225,12 +286,33 @@ function CaseQueueContent() {
             <span className="hidden sm:inline">Filters</span>
           </button>
           <button
+            onClick={() => setShowPollLog(!showPollLog)}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg transition-colors ${
+              showPollLog
+                ? 'border-[#185FA5] bg-blue-50 dark:bg-blue-900/20 text-[#185FA5] dark:text-blue-300'
+                : 'border-gray-300 dark:border-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+            title="Show poll log"
+          >
+            <Activity className="w-4 h-4" />
+            <span className="hidden sm:inline">Poll Log</span>
+          </button>
+          <button
             onClick={exportCsv}
             className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             title="Export to CSV"
           >
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Export</span>
+          </button>
+          <button
+            onClick={pollNow}
+            disabled={polling}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-[#185FA5] text-[#185FA5] dark:border-[#378ADD] dark:text-[#378ADD] rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 transition-colors"
+            title="Trigger an immediate Gmail poll"
+          >
+            <Mail className={`w-4 h-4 ${polling ? 'animate-pulse' : ''}`} />
+            <span className="hidden sm:inline">{polling ? 'Polling...' : 'Poll Now'}</span>
           </button>
           <button
             onClick={() => fetchCases()}
@@ -241,6 +323,91 @@ function CaseQueueContent() {
           </button>
         </div>
       </div>
+
+      {/* Poll result toast */}
+      {pollResult && (
+        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200 rounded-lg text-sm">
+          {pollResult}
+        </div>
+      )}
+
+      {/* Poll log panel */}
+      {showPollLog && (
+        <div className="mb-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[#185FA5]" />
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Gmail Poll History</h2>
+            </div>
+            {pollStats && (
+              <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+                <span>{pollStats.total_polls} polls / 24h</span>
+                <span>{pollStats.messages_found} messages found</span>
+                {pollStats.errors > 0 && (
+                  <span className="text-red-600 dark:text-red-400">{pollStats.errors} errors</span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="overflow-x-auto max-h-80">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 sticky top-0">
+                  <th className="text-left px-4 py-2 font-medium">Started</th>
+                  <th className="text-left px-4 py-2 font-medium">Duration</th>
+                  <th className="text-right px-4 py-2 font-medium">Found</th>
+                  <th className="text-right px-4 py-2 font-medium">Ingested</th>
+                  <th className="text-left px-4 py-2 font-medium">Trigger</th>
+                  <th className="text-left px-4 py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pollHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-gray-400">
+                      No polls recorded yet. The worker may not be running — check Railway logs.
+                    </td>
+                  </tr>
+                ) : (
+                  pollHistory.map((p) => {
+                    const trigger = ((p.metadata as { trigger?: string } | null)?.trigger) || 'scheduled';
+                    return (
+                      <tr key={p.id} className="border-t border-gray-100 dark:border-gray-700">
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          {new Date(p.started_at).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                          {p.duration_ms !== null ? `${p.duration_ms}ms` : p.finished_at ? '—' : <span className="text-yellow-600">running...</span>}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{p.messages_found}</td>
+                        <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">{p.cases_inserted}</td>
+                        <td className="px-4 py-2">
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            trigger === 'manual'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                          }`}>{trigger}</span>
+                        </td>
+                        <td className="px-4 py-2">
+                          {p.error ? (
+                            <span className="text-red-600 dark:text-red-400 truncate max-w-xs inline-block" title={p.error}>
+                              ⚠ {p.error.substring(0, 60)}
+                            </span>
+                          ) : p.finished_at ? (
+                            <span className="text-green-600 dark:text-green-400">✓ ok</span>
+                          ) : (
+                            <span className="text-yellow-600">…</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* New cases notification banner */}
       {newCasesCount > 0 && (
