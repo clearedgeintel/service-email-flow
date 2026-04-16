@@ -657,6 +657,274 @@
 
 ---
 
+## 18. Email Templates
+
+### TC-TEMPLATE-01: View templates
+**Steps:**
+1. Settings → Email Templates tab
+
+**Expected:** 5 templates listed (AI Reply System Instructions, Emergency Fallback, Standard Fallback, Follow-up #1, Follow-up #2). Each shows body preview and variable chips.
+- [ ] Pass
+
+### TC-TEMPLATE-02: Edit and save template
+**Steps:**
+1. Click **Edit** on "Follow-up #1"
+2. Change the greeting from "Hi {{customer_name}}" to "Hello {{customer_name}}"
+3. Click **Save**
+
+**Expected:** Template updates. Card exits edit mode. Change persists on refresh. Next follow-up email uses the updated text.
+- [ ] Pass
+
+### TC-TEMPLATE-03: Variable substitution
+**Steps:**
+1. Edit the standard fallback template body
+2. Add `{{business_phone}}` somewhere new
+3. Save
+4. Trigger a case where the LLM is down (or set invalid ANTHROPIC_API_KEY)
+
+**Expected:** Fallback reply uses the DB template with the phone number substituted.
+- [ ] Pass
+
+### TC-TEMPLATE-04: Missing template fallback
+**Precondition:** Delete a template row from the `email_templates` table.
+**Steps:**
+1. Trigger a case that would use that template
+
+**Expected:** Service falls back to the hardcoded default in code. No error thrown.
+- [ ] Pass
+
+---
+
+## 19. Smart Scheduling (Cal.com Slots)
+
+### TC-SLOTS-01: Enable smart scheduling
+**Precondition:** Cal.com API key and event type IDs configured in Settings.
+**Steps:**
+1. Settings → Reply Mode → toggle **Smart scheduling** ON
+2. Save settings
+3. Send a test repair email to the monitored inbox
+4. Wait for pipeline to process
+
+**Expected:** Reply email (or draft) includes 3 tappable time slot buttons with real availability from Cal.com. Each links to Cal.com with `?date=...&slot=...` pre-filled.
+- [ ] Pass
+
+### TC-SLOTS-02: Slot fallback when API key missing
+**Precondition:** Smart scheduling ON, but `calcom_api_key` is empty.
+**Steps:**
+1. Ingest a test email
+
+**Expected:** Reply falls back to the generic booking CTA button. No error. Pipeline continues normally.
+- [ ] Pass
+
+### TC-SLOTS-03: Slot fallback when Cal.com API is down
+**Precondition:** Smart scheduling ON with valid API key.
+**Steps:**
+1. Temporarily set Cal.com API key to an invalid value
+2. Ingest a test email
+
+**Expected:** Reply falls back to generic CTA button. Worker logs warning. Case completes normally.
+- [ ] Pass
+
+### TC-SLOTS-04: Different event types per intent
+**Steps:**
+1. Configure different event type IDs for emergency, service, and estimate
+2. Send a repair request email → reply should query the service event type slots
+3. Send a sales inquiry → reply should query the estimate event type slots
+
+**Expected:** Each reply offers slots from the correct Cal.com event type.
+- [ ] Pass
+
+### TC-SLOTS-05: Smart scheduling OFF
+**Precondition:** Smart scheduling toggle OFF.
+**Steps:**
+1. Ingest a test email
+
+**Expected:** Reply uses the generic booking button. No Cal.com API calls made.
+- [ ] Pass
+
+---
+
+## 20. Outbound Webhooks
+
+### TC-WEBHOOK-01: Create webhook subscription
+**Steps:**
+1. Settings → Webhooks tab
+2. Fill name, URL (use webhook.site or requestbin for testing), select `case.created` and `case.classified` events
+3. Click **Create webhook**
+
+**Expected:** Subscription appears in the list with a generated signing secret.
+- [ ] Pass
+
+### TC-WEBHOOK-02: Test delivery
+**Steps:**
+1. Click **Test** on the new subscription
+
+**Expected:** Toast shows "Test queued." Webhook receiver (webhook.site) shows a POST with `X-ClearDesk-Event: webhook.test`, a valid `X-ClearDesk-Signature-256`, and JSON body.
+- [ ] Pass
+
+### TC-WEBHOOK-03: Real event delivery
+**Steps:**
+1. Ensure subscription is active and subscribed to `case.created`
+2. Send a test email to the monitored inbox
+3. Wait for intake
+
+**Expected:** Webhook receiver gets a POST with `event: "case.created"`, `case_id`, `timestamp`, and `data.from_email`, `data.subject`, etc.
+- [ ] Pass
+
+### TC-WEBHOOK-04: Signature verification
+**Steps:**
+1. On webhook receiver, compute `HMAC-SHA256(raw_body, subscription_secret)` in hex
+2. Compare against `X-ClearDesk-Signature-256` header
+
+**Expected:** Signatures match. This proves the payload was signed by ClearDesk with the subscription's secret.
+- [ ] Pass
+
+### TC-WEBHOOK-05: Disable subscription
+**Steps:**
+1. Click **Disable** on a subscription
+2. Trigger a case event the subscription was listening to
+
+**Expected:** No webhook POST delivered. Subscription shows "disabled" badge.
+- [ ] Pass
+
+### TC-WEBHOOK-06: Delete subscription
+**Steps:**
+1. Click **Delete** on a subscription. Confirm the prompt.
+
+**Expected:** Subscription removed from list. No more deliveries. Delivery history for that subscription is also removed.
+- [ ] Pass
+
+### TC-WEBHOOK-07: Retry on failure
+**Precondition:** Webhook URL points to a server that returns 500.
+**Steps:**
+1. Trigger a subscribed event
+
+**Expected:** Worker retries up to 4 times with exponential backoff (3s, 9s, 27s, 81s). `webhook_deliveries` table shows each attempt with `status=failed` and the HTTP 500 response.
+- [ ] Pass
+
+### TC-WEBHOOK-08: Show/hide signing secret
+**Steps:**
+1. Click **Show signing secret** on a subscription
+2. Click **Hide signing secret**
+
+**Expected:** Secret reveals/hides. The secret is a 64-char hex string.
+- [ ] Pass
+
+---
+
+## 21. Customer Portal
+
+### TC-PORTAL-01: Status link in reply email
+**Precondition:** Migration 013 applied. Portal enabled.
+**Steps:**
+1. Ingest a new email, let the pipeline send a reply (or create a draft)
+2. Check the sent email (or draft) footer
+
+**Expected:** Footer contains "📋 Check your case status →" link with a `/status/[token]` URL.
+- [ ] Pass
+
+### TC-PORTAL-02: View case status
+**Steps:**
+1. Click (or navigate to) the status URL from TC-PORTAL-01
+
+**Expected:** Branded ClearDesk page showing:
+- Status hero card with customer-friendly label (e.g., "Awaiting Your Booking")
+- Status description explaining what happens next
+- Case details (customer name, subject, problem summary, received date, reply date)
+- Timeline of customer-visible events
+- [ ] Pass
+
+### TC-PORTAL-03: Booking shown on portal
+**Precondition:** Case has a Cal.com booking (booked via webhook).
+**Steps:**
+1. Open the customer portal page for that case
+
+**Expected:** Green "Appointment Scheduled" card with date/time visible.
+- [ ] Pass
+
+### TC-PORTAL-04: Invalid/expired token
+**Steps:**
+1. Navigate to `/status/invalid-token-123`
+
+**Expected:** "Case Not Found" error page with helpful message. No PII leaked.
+- [ ] Pass
+
+### TC-PORTAL-05: Rate limiting
+**Steps:**
+1. Hit `GET /api/public/case/[token]` more than 30 times in one minute from the same IP
+
+**Expected:** Returns 429 Too Many Requests.
+- [ ] Pass
+
+### TC-PORTAL-06: Archived case not shown
+**Precondition:** Case has been archived (`archived_at` is set).
+**Steps:**
+1. Navigate to the status URL for that case
+
+**Expected:** Returns "Case not found" — archived cases are not exposed on the public portal.
+- [ ] Pass
+
+### TC-PORTAL-07: Portal disabled
+**Steps:**
+1. Set `portal_enabled` to `false` in Settings
+2. Navigate to any status URL
+
+**Expected:** Returns 503 "Portal disabled".
+- [ ] Pass
+
+### TC-PORTAL-08: Customer-friendly status labels
+**Steps:**
+1. Create cases in different statuses (RECEIVED, ESCALATED, CLOSED, etc.)
+2. View each on the portal
+
+**Expected:**
+- RECEIVED → "Received"
+- CLASSIFIED → "In Review"
+- RESPONDED_PENDING_BOOKING → "Awaiting Your Booking"
+- ESCALATED → "Urgent — Contacting You"
+- NEEDS_MANUAL_CALL → "We Will Call You"
+- CLOSED → "Completed"
+- [ ] Pass
+
+---
+
+## 22. Auto-Reply Gate
+
+### TC-AUTOREPLY-01: Toggle OFF prevents all customer sends
+**Precondition:** auto_reply toggle OFF in Settings.
+**Steps:**
+1. Ingest a new email, let it classify and route
+2. Check Gmail drafts folder
+
+**Expected:** Reply saved as Gmail draft, NOT sent. Case shows "Pending Draft Reply" in dashboard.
+- [ ] Pass
+
+### TC-AUTOREPLY-02: Follow-ups respect auto-reply OFF
+**Precondition:** auto_reply OFF. Case has customer_reply_sent=true and enough time has passed.
+**Steps:**
+1. Wait for followup worker cycle (or trigger manually)
+
+**Expected:** Follow-up saved as Gmail draft with "Pending Follow-up #N" card in dashboard. followup_count NOT incremented until admin approves.
+- [ ] Pass
+
+### TC-AUTOREPLY-03: Emergency bypasses draft mode
+**Precondition:** auto_reply OFF.
+**Steps:**
+1. Send an emergency email (e.g., "gas leak in kitchen")
+
+**Expected:** Reply sent immediately despite auto-reply being off. Emergencies always auto-send.
+- [ ] Pass
+
+### TC-AUTOREPLY-04: Toggle ON resumes auto-sending
+**Steps:**
+1. Set auto_reply ON and save
+2. Ingest a new email
+
+**Expected:** Reply sent immediately. No draft created.
+- [ ] Pass
+
+---
+
 ## Release Checklist
 
 Before marking a release ready:
@@ -667,6 +935,11 @@ Before marking a release ready:
 - [ ] Bulk actions complete successfully
 - [ ] CSV export downloads correctly
 - [ ] Cal.com webhook integration (if configured)
+- [ ] Smart scheduling slots render in emails (if configured)
+- [ ] Outbound webhook delivery (TC-WEBHOOK-02 test delivery)
+- [ ] Customer portal accessible via token link (TC-PORTAL-02)
+- [ ] Email templates editable and applied (TC-TEMPLATE-02)
+- [ ] Auto-reply gate works for both replies and follow-ups
 - [ ] Dark mode and mobile views render correctly
 - [ ] `npm run test:run` — all unit/integration tests pass
 - [ ] `npm run build` — production build succeeds
