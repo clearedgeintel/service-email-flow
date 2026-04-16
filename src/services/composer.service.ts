@@ -56,6 +56,10 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
   const isEmergency = row.status === 'ESCALATED' || row.urgency_level === 'EMERGENCY';
   const { calcomUrl, calcomLabel } = await selectCalcomLink(row.intent, row.urgency_level, isEmergency);
 
+  // Smart scheduling: fetch 3-5 available Cal.com slots (if configured).
+  // Returns [] on any failure so we gracefully fall back to the generic CTA.
+  const slotOptions = await fetchSlotsForCase(row.intent, isEmergency, calcomUrl);
+
   // Build LLM prompt with circuit breaker fallback
   const replyParams = {
     row,
@@ -65,6 +69,7 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     calcomLabel,
     pricingInfo: hasPricing ? formatPricingForPrompt(pricingItems) : null,
     isEmergency,
+    slotOptions,
   };
 
   const { result: replyText, usedFallback } = await withCircuitBreaker(
@@ -102,6 +107,7 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     ctaLabel: calcomLabel,
     isEmergency,
     pricingHtml,
+    slotOptions,
   });
 
   // Idempotency check: re-verify reply hasn't been sent by a concurrent job
@@ -227,6 +233,57 @@ async function selectCalcomLink(
   return { calcomUrl: url, calcomLabel: 'Free Estimate / Consultation' };
 }
 
+/**
+ * Fetch pre-filled Cal.com slot options for injection into the reply email.
+ * Picks the correct event type ID based on intent/emergency and returns [] if
+ * smart scheduling is disabled or any call fails (graceful degradation).
+ */
+async function fetchSlotsForCase(
+  intent: string | null,
+  isEmergency: boolean,
+  calcomUrl: string,
+) {
+  const enabledRaw = await getConfig<unknown>('smart_scheduling_enabled', false);
+  const enabled = enabledRaw === true || enabledRaw === 'true';
+  if (!enabled) return [];
+
+  const apiKey = await getConfig<string>('calcom_api_key', '');
+  if (!apiKey) return [];
+
+  // Pick the right event type ID mirroring selectCalcomLink's routing
+  let eventTypeId = 0;
+  if (isEmergency) {
+    eventTypeId = await getConfig<number>('calcom_event_type_emergency', 0);
+  } else if (intent === 'REPAIR_REQUEST') {
+    eventTypeId = await getConfig<number>('calcom_event_type_service', 0);
+  } else {
+    eventTypeId = await getConfig<number>('calcom_event_type_estimate', 0);
+  }
+
+  // Coerce string values from JSONB storage
+  const eventTypeIdNum = typeof eventTypeId === 'number' ? eventTypeId : parseInt(String(eventTypeId), 10);
+  if (!eventTypeIdNum || isNaN(eventTypeIdNum)) return [];
+
+  const [timezone, daysAheadRaw, maxSlotsRaw] = await Promise.all([
+    getConfig<string>('business_timezone', 'America/Chicago'),
+    getConfig<number>('slot_suggestion_days', 7),
+    getConfig<number>('slot_suggestion_count', 3),
+  ]);
+
+  const daysAhead = typeof daysAheadRaw === 'number' ? daysAheadRaw : parseInt(String(daysAheadRaw), 10) || 7;
+  const maxSlots = typeof maxSlotsRaw === 'number' ? maxSlotsRaw : parseInt(String(maxSlotsRaw), 10) || 3;
+
+  const { fetchAvailableSlots } = await import('@/services/cal-slots.service');
+  return fetchAvailableSlots({
+    apiKey,
+    eventTypeId: eventTypeIdNum,
+    calcomUrl,
+    timezone,
+    daysAhead,
+    maxSlots: Math.min(Math.max(maxSlots, 1), 5),
+  });
+}
+
 async function generateReplyText(params: {
   row: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   businessName: string;
@@ -235,10 +292,21 @@ async function generateReplyText(params: {
   calcomLabel: string;
   pricingInfo: string | null;
   isEmergency: boolean;
+  slotOptions?: Array<{ date_display: string; time_display: string }>;
 }): Promise<string> {
-  const { row, businessName, businessPhone, calcomUrl, calcomLabel, pricingInfo, isEmergency } = params;
+  const { row, businessName, businessPhone, calcomUrl, calcomLabel, pricingInfo, isEmergency, slotOptions } = params;
 
   let context = '';
+
+  if (slotOptions && slotOptions.length > 0) {
+    const slotList = slotOptions.map((s) => `- ${s.date_display} at ${s.time_display}`).join('\n');
+    context += `
+The customer will see these specific available time slots as clickable buttons below your reply:
+${slotList}
+
+Briefly acknowledge the upcoming availability (e.g., "I have a few openings this week") but do NOT list the specific times in your text — the buttons render them separately. One short sentence is enough.
+`;
+  }
 
   if (isEmergency) {
     context += `
@@ -339,6 +407,7 @@ async function generateFallbackReply(params: {
   calcomLabel: string;
   pricingInfo: string | null;
   isEmergency: boolean;
+  slotOptions?: Array<{ date_display: string; time_display: string }>;
 }): Promise<string> {
   const { row, businessName, businessPhone, isEmergency } = params;
   const name = (row.customer_name as string) || 'there';

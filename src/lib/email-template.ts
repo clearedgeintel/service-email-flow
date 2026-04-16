@@ -1,3 +1,10 @@
+export interface SlotOption {
+  iso: string;
+  date_display: string;
+  time_display: string;
+  booking_url: string;
+}
+
 export interface EmailTemplateParams {
   bodyHtml: string;
   businessName: string;
@@ -8,6 +15,7 @@ export interface EmailTemplateParams {
   ctaLabel: string;
   isEmergency: boolean;
   pricingHtml?: string;
+  slotOptions?: SlotOption[];
 }
 
 export function buildHtmlEmail(params: EmailTemplateParams): string {
@@ -21,9 +29,31 @@ export function buildHtmlEmail(params: EmailTemplateParams): string {
     ctaLabel,
     isEmergency,
     pricingHtml,
+    slotOptions,
   } = params;
 
-  const ctaColor = isEmergency ? '#dc2626' : '#1a73e8';
+  const ctaColor = isEmergency ? '#dc2626' : '#185FA5';
+  const brandNavy = '#0C447C';
+  const brandBlue = '#185FA5';
+
+  // Render 3-5 pre-filled slot buttons above the fallback CTA
+  const slotsHtml = slotOptions && slotOptions.length > 0
+    ? `
+      <div style="margin:20px 0;">
+        <p style="margin:0 0 12px 0;font-size:15px;font-weight:600;color:#333;">Available times:</p>
+        ${slotOptions
+          .map(
+            (s) => `<a href="${s.booking_url}" target="_blank" style="display:block;padding:12px 16px;margin-bottom:8px;border:1px solid ${brandBlue};border-radius:8px;text-decoration:none;color:${brandNavy};font-family:Arial,sans-serif;font-size:15px;background:#ffffff;">
+              <strong style="color:${brandNavy};">${s.date_display}</strong>
+              <span style="color:${brandBlue};margin-left:8px;">${s.time_display}</span>
+            </a>`,
+          )
+          .join('')}
+        <p style="margin:12px 0 0 0;font-size:13px;color:#666;">
+          <a href="${ctaUrl}" target="_blank" style="color:${brandBlue};text-decoration:underline;">Prefer a different time? See all available slots →</a>
+        </p>
+      </div>`
+    : '';
 
   const emergencyBanner = isEmergency
     ? `<div style="background:#dc2626;color:#ffffff;padding:16px 20px;border-radius:8px;margin:0 0 24px 0;">
@@ -54,7 +84,7 @@ export function buildHtmlEmail(params: EmailTemplateParams): string {
 
           <!-- HEADER -->
           <tr>
-            <td style="background:linear-gradient(135deg, #1a73e8, #0d47a1);padding:28px 32px;border-radius:12px 12px 0 0;">
+            <td style="background:linear-gradient(135deg, #185FA5, #0C447C);padding:28px 32px;border-radius:12px 12px 0 0;">
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>
@@ -75,9 +105,10 @@ export function buildHtmlEmail(params: EmailTemplateParams): string {
               ${emergencyBanner}
               ${bodyHtml}
               ${pricingHtml || ''}
+              ${slotsHtml}
               <div style="text-align:center;">
-                ${ctaHtml}
-                <p style="margin:0;font-size:14px;color:#666;">Or call us directly at <a href="tel:${businessPhone.replace(/\D/g, '')}" style="color:#1a73e8;font-weight:600;text-decoration:none;">${businessPhone}</a></p>
+                ${slotOptions && slotOptions.length > 0 ? '' : ctaHtml}
+                <p style="margin:0;font-size:14px;color:#666;">Or call us directly at <a href="tel:${businessPhone.replace(/\D/g, '')}" style="color:${brandBlue};font-weight:600;text-decoration:none;">${businessPhone}</a></p>
               </div>
             </td>
           </tr>
@@ -86,7 +117,7 @@ export function buildHtmlEmail(params: EmailTemplateParams): string {
           <tr>
             <td style="background:#f7f8fa;padding:24px 32px;border-top:1px solid #e8e8e8;border-radius:0 0 12px 12px;">
               <p style="margin:0;font-size:14px;font-weight:600;color:#333;">${businessName}</p>
-              <p style="margin:4px 0 0 0;font-size:13px;color:#777;">${businessLocation} &bull; <a href="${businessUrl}" style="color:#1a73e8;text-decoration:none;">${businessUrl.replace('https://', '')}</a></p>
+              <p style="margin:4px 0 0 0;font-size:13px;color:#777;">${businessLocation} &bull; <a href="${businessUrl}" style="color:#185FA5;text-decoration:none;">${businessUrl.replace('https://', '')}</a></p>
               <p style="margin:4px 0 0 0;font-size:13px;color:#777;">📞 ${businessPhone}</p>
               <p style="margin:16px 0 0 0;font-size:11px;color:#aaa;line-height:1.4;">This email was sent in response to your inquiry. If you did not contact us, please disregard this message.</p>
             </td>
@@ -110,7 +141,7 @@ export function buildPricingTableHtml(
       (item) => `
     <tr>
       <td style="padding:10px 14px;border-bottom:1px solid #eef0f3;font-size:14px;color:#333;">${item.service}</td>
-      <td style="padding:10px 14px;border-bottom:1px solid #eef0f3;font-size:14px;color:#1a73e8;font-weight:600;text-align:right;white-space:nowrap;">$${item.price_min} – $${item.price_max}</td>
+      <td style="padding:10px 14px;border-bottom:1px solid #eef0f3;font-size:14px;color:#185FA5;font-weight:600;text-align:right;white-space:nowrap;">$${item.price_min} – $${item.price_max}</td>
       <td style="padding:10px 14px;border-bottom:1px solid #eef0f3;font-size:13px;color:#777;text-align:right;">${item.unit}</td>
     </tr>`,
     )

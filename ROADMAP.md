@@ -237,7 +237,9 @@ Core workflow that predates this roadmap:
 - [x] Sentiment analysis on customer emails (score -1.0 to 1.0 + label, extracted by OpenAI)
 - [x] Repeat customer detection (`GET /api/customers` lists repeat customers with profiles)
 - [x] Auto-tagging and categorization trends (`GET /api/trends` weekly intent/trade/urgency trends)
-- [ ] Smart scheduling (suggest times based on tech availability)
+- [x] Smart scheduling — Cal.com `/v2/slots` integration, reply emails include
+  3–5 tappable time buttons per intent/urgency (migration 011, cal-slots.service,
+  email-template slot rendering, Settings → Smart Scheduling toggle + config)
 
 ### 8.5 Integrations
 - [x] Cal.com webhook integration (booking tracking, auto-close on meeting end)

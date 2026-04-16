@@ -52,6 +52,18 @@ const SETTING_GROUPS = [
       { key: 'slack_webhook_url', label: 'Slack Webhook URL', type: 'url' },
     ],
   },
+  {
+    title: 'Smart Scheduling (Cal.com Slots)',
+    fields: [
+      { key: 'calcom_api_key', label: 'Cal.com API Key', type: 'password' },
+      { key: 'calcom_event_type_emergency', label: 'Emergency Event Type ID', type: 'number' },
+      { key: 'calcom_event_type_service', label: 'Service Call Event Type ID', type: 'number' },
+      { key: 'calcom_event_type_estimate', label: 'Estimate Event Type ID', type: 'number' },
+      { key: 'business_timezone', label: 'Business Timezone (IANA)', type: 'text' },
+      { key: 'slot_suggestion_days', label: 'Days of availability to query', type: 'number' },
+      { key: 'slot_suggestion_count', label: 'Slots to show in email (1-5)', type: 'number' },
+    ],
+  },
 ];
 
 export default function SettingsPage() {
@@ -396,6 +408,24 @@ export default function SettingsPage() {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.auto_reply === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.auto_reply === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Smart scheduling (Cal.com slots)</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {settings.smart_scheduling_enabled === 'true'
+                    ? 'Reply emails include 3–5 tappable Cal.com time slots. Falls back to the generic booking link if the Cal.com API is unreachable.'
+                    : 'Disabled — reply emails use the single generic booking link (current behavior).'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, smart_scheduling_enabled: settings.smart_scheduling_enabled === 'true' ? 'false' : 'true' })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.smart_scheduling_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.smart_scheduling_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
           </div>
