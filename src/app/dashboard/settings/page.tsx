@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Plus, Trash2, Check, Tag, RefreshCw } from 'lucide-react';
+import { Save, Plus, Trash2, Check, Tag, RefreshCw, Key, Eye, EyeOff } from 'lucide-react';
 
 interface PricingItem {
   id: number;
@@ -120,6 +120,34 @@ export default function SettingsPage() {
   const [templateSaving, setTemplateSaving] = useState<string | null>(null);
   const [resyncing, setResyncing] = useState(false);
   const [resyncResult, setResyncResult] = useState<string | null>(null);
+  const [n8nApiKey, setN8nApiKey] = useState<string | null>(null);
+  const [n8nKeyRevealed, setN8nKeyRevealed] = useState(false);
+  const [n8nKeyRotating, setN8nKeyRotating] = useState(false);
+
+  const revealN8nKey = async () => {
+    if (n8nApiKey) { setN8nKeyRevealed(true); return; }
+    const res = await fetch('/api/n8n/api-key');
+    if (res.ok) {
+      const data = await res.json();
+      setN8nApiKey(data.api_key);
+      setN8nKeyRevealed(true);
+    }
+  };
+
+  const rotateN8nKey = async () => {
+    if (!confirm('Rotate the n8n callback API key? All existing n8n workflows will stop working until you update their credential.')) return;
+    setN8nKeyRotating(true);
+    try {
+      const res = await fetch('/api/n8n/api-key', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setN8nApiKey(data.api_key);
+        setN8nKeyRevealed(true);
+      }
+    } finally {
+      setN8nKeyRotating(false);
+    }
+  };
 
   const resyncLabels = async () => {
     if (!confirm('Resync Gmail labels for all existing cases? This may take a few minutes.')) return;
@@ -716,6 +744,44 @@ export default function SettingsPage() {
               {resyncResult && (
                 <span className="text-sm text-gray-600">{resyncResult}</span>
               )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Key className="w-4 h-4 text-gray-600" />
+              <h2 className="font-semibold text-gray-900">n8n Integration</h2>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              API key used by n8n workflows calling POST <code className="bg-gray-100 px-1 rounded">/api/n8n/callback</code>.
+              Send as <code className="bg-gray-100 px-1 rounded">Authorization: Bearer &lt;key&gt;</code>. Workflow templates
+              live in <code className="bg-gray-100 px-1 rounded">docs/n8n-workflows/</code>.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type={n8nKeyRevealed ? 'text' : 'password'}
+                value={n8nApiKey || '••••••••••••••••••••••••••••••••'}
+                readOnly
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono bg-gray-50 text-gray-700"
+              />
+              <button
+                type="button"
+                onClick={n8nKeyRevealed ? () => setN8nKeyRevealed(false) : revealN8nKey}
+                className="p-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"
+                title={n8nKeyRevealed ? 'Hide' : 'Reveal'}
+              >
+                {n8nKeyRevealed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={rotateN8nKey}
+                disabled={n8nKeyRotating}
+                className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5"
+                title="Rotate (invalidates existing workflows)"
+              >
+                <RefreshCw className={`w-4 h-4 ${n8nKeyRotating ? 'animate-spin' : ''}`} />
+                Regenerate
+              </button>
             </div>
           </div>
 

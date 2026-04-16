@@ -1,0 +1,135 @@
+{
+  "name": "ClearDesk: Email call summary after voice call ends",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cleardesk-call-ended",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "ClearDesk Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "cleardesk-call-ended"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 2 },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "call.ended",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "2",
+              "leftValue": "={{ $json.body.case_id }}",
+              "rightValue": "",
+              "operator": { "type": "object", "operation": "notEmpty" }
+            }
+          ]
+        }
+      },
+      "id": "filter-call-ended",
+      "name": "Only call.ended with case",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://cleardesk.yourcompany.com/api/cases/{{ $json.body.case_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-case",
+      "name": "Fetch case details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CLEARDESK_API_KEY_CREDENTIAL_ID",
+          "name": "ClearDesk API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "dispatch@yourcompany.com",
+        "toEmail": "={{ $json.case.customer_email }}",
+        "subject": "=Re: your call with {{ $json.case.customer_name || 'us' }}",
+        "emailType": "text",
+        "text": "=Hi {{ $json.case.customer_name || 'there' }},\n\nThanks for calling. Quick recap of what we discussed:\n\n{{ $('ClearDesk Webhook').item.json.body.data.disconnection_reason ? 'Call ended: ' + $('ClearDesk Webhook').item.json.body.data.disconnection_reason + '.' : '' }}\n\n{{ $json.case.problem_summary || '' }}\n\nWe'll follow up shortly to confirm next steps. Reply to this email if anything changes in the meantime.\n\n— Dispatch",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send summary email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [900, 200],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cleardesk.yourcompany.com/api/n8n/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"action\": \"add_note\", \"case_id\": {{ $('ClearDesk Webhook').item.json.body.case_id }}, \"note\": \"Call summary email sent to {{ $('Fetch case details').item.json.case.customer_email }}\", \"actor\": \"n8n-call-summary\" }",
+        "options": {}
+      },
+      "id": "log-note",
+      "name": "Log note back to ClearDesk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CLEARDESK_API_KEY_CREDENTIAL_ID",
+          "name": "ClearDesk API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "ClearDesk Webhook": {
+      "main": [[{ "node": "Only call.ended with case", "type": "main", "index": 0 }]]
+    },
+    "Only call.ended with case": {
+      "main": [[{ "node": "Fetch case details", "type": "main", "index": 0 }]]
+    },
+    "Fetch case details": {
+      "main": [[{ "node": "Send summary email", "type": "main", "index": 0 }]]
+    },
+    "Send summary email": {
+      "main": [[{ "node": "Log note back to ClearDesk", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "After a Retell voice call ends on a case, fetch the case, send a recap email to the customer, then POST an add_note back to ClearDesk so the action is visible in the case timeline."
+  },
+  "tags": [
+    { "name": "cleardesk" },
+    { "name": "voice" },
+    { "name": "email" }
+  ]
+}

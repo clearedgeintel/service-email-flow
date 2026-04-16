@@ -1,0 +1,110 @@
+{
+  "name": "ClearDesk: SMS on-call tech on EMERGENCY case",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cleardesk-emergency",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "ClearDesk Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "cleardesk-emergency"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "version": 2 },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "1",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "case.classified",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "id": "2",
+              "leftValue": "={{ $json.body.data.urgency_level }}",
+              "rightValue": "EMERGENCY",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "filter-emergency",
+      "name": "Only EMERGENCY",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "from": "+15551234567",
+        "to": "+15559998888",
+        "message": "=ClearDesk EMERGENCY: Case #{{ $json.body.case_id }} — {{ $json.body.data.from_name }} {{ $json.body.data.customer_phone || '' }}. {{ $json.body.data.problem_summary || $json.body.data.subject }}"
+      },
+      "id": "send-sms",
+      "name": "SMS on-call tech",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [680, 200],
+      "credentials": {
+        "twilioApi": {
+          "id": "REPLACE_WITH_YOUR_TWILIO_CREDENTIAL_ID",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cleardesk.yourcompany.com/api/n8n/callback",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"action\": \"add_event\", \"case_id\": {{ $('ClearDesk Webhook').item.json.body.case_id }}, \"event_type\": \"TECH_NOTIFIED\", \"summary\": \"On-call tech SMS'd via n8n\", \"metadata\": { \"twilio_sid\": \"{{ $json.sid }}\", \"to\": \"{{ $json.to }}\" } }",
+        "options": {}
+      },
+      "id": "log-event",
+      "name": "Log event back to ClearDesk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CLEARDESK_API_KEY_CREDENTIAL_ID",
+          "name": "ClearDesk API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "ClearDesk Webhook": {
+      "main": [[{ "node": "Only EMERGENCY", "type": "main", "index": 0 }]]
+    },
+    "Only EMERGENCY": {
+      "main": [[{ "node": "SMS on-call tech", "type": "main", "index": 0 }]]
+    },
+    "SMS on-call tech": {
+      "main": [[{ "node": "Log event back to ClearDesk", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "On case.classified + EMERGENCY urgency: send Twilio SMS to on-call tech, then POST back to /api/n8n/callback with action=add_event to log TECH_NOTIFIED on the case timeline. The HTTP Header Auth credential should have name=Authorization and value=Bearer <your n8n callback API key from Settings>."
+  },
+  "tags": [
+    { "name": "cleardesk" },
+    { "name": "emergency" },
+    { "name": "sms" }
+  ]
+}
