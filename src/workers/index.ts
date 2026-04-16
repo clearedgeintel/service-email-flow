@@ -13,6 +13,7 @@ import { startFollowupWorker } from './followup.worker';
 import { startDigestWorker } from './digest.worker';
 import { startErrorAlertWorker } from './error-alert.worker';
 import { startWebhookDispatchWorker } from './webhook-dispatch.worker';
+import { startSmsReplyWorker } from './sms-reply.worker';
 
 const workers: Array<{ close: () => Promise<void> }> = [];
 const startedAt = new Date().toISOString();
@@ -34,6 +35,7 @@ async function main() {
   workers.push(startDigestWorker());
   workers.push(startErrorAlertWorker());
   workers.push(startWebhookDispatchWorker());
+  workers.push(startSmsReplyWorker());
 
   logger.info(`All workers started (${workers.length} active)`);
 
