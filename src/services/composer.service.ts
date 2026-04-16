@@ -57,8 +57,12 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
   const { calcomUrl, calcomLabel } = await selectCalcomLink(row.intent, row.urgency_level, isEmergency);
 
   // Smart scheduling: fetch 3-5 available Cal.com slots (if configured).
-  // Returns [] on any failure so we gracefully fall back to the generic CTA.
   const slotOptions = await fetchSlotsForCase(row.intent, isEmergency, calcomUrl);
+
+  // Generate customer portal status token for "Check your case status" link
+  const { getOrCreateCaseToken, buildStatusUrl } = await import('./case-token.service');
+  const portalToken = await getOrCreateCaseToken(caseId);
+  const statusUrl = portalToken ? await buildStatusUrl(portalToken) : '';
 
   // Build LLM prompt with circuit breaker fallback
   const replyParams = {
@@ -108,6 +112,7 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
     isEmergency,
     pricingHtml,
     slotOptions,
+    statusUrl,
   });
 
   // Idempotency check: re-verify reply hasn't been sent by a concurrent job

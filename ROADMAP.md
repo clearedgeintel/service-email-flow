@@ -222,9 +222,14 @@ Core workflow that predates this roadmap:
 - [x] Dark mode (class-based toggle, localStorage persistence)
 - [x] Real-time updates (30s polling with "new cases available" banner)
 
-### 8.2 Customer Portal
-- [ ] Self-service status check (customer enters email → sees case status)
-- [ ] Reschedule/cancel booking link
+### 8.2 Customer Portal — COMPLETE
+- [x] Self-service status page at `/status/[token]` — tokenized, no auth required,
+  branded ClearDesk page showing status, booking, timeline, problem summary
+- [x] `case_access_tokens` table (migration 013) with auto-generate on reply send
+- [x] Public API `GET /api/public/case/[token]` — rate limited, returns sanitized data
+- [x] Composer injects `{{status_url}}` link in email footer: "Check your case status →"
+- [x] Customer-friendly status labels and timeline event descriptions
+- [ ] Reschedule deep-link from portal to Cal.com reschedule URL
 - [ ] Customer satisfaction survey after case close
 
 ### 8.3 Multi-Business Support

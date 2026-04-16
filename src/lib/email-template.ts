@@ -16,6 +16,7 @@ export interface EmailTemplateParams {
   isEmergency: boolean;
   pricingHtml?: string;
   slotOptions?: SlotOption[];
+  statusUrl?: string;
 }
 
 export function buildHtmlEmail(params: EmailTemplateParams): string {
@@ -30,6 +31,7 @@ export function buildHtmlEmail(params: EmailTemplateParams): string {
     isEmergency,
     pricingHtml,
     slotOptions,
+    statusUrl,
   } = params;
 
   const ctaColor = isEmergency ? '#dc2626' : '#185FA5';
@@ -119,7 +121,8 @@ export function buildHtmlEmail(params: EmailTemplateParams): string {
               <p style="margin:0;font-size:14px;font-weight:600;color:#333;">${businessName}</p>
               <p style="margin:4px 0 0 0;font-size:13px;color:#777;">${businessLocation} &bull; <a href="${businessUrl}" style="color:#185FA5;text-decoration:none;">${businessUrl.replace('https://', '')}</a></p>
               <p style="margin:4px 0 0 0;font-size:13px;color:#777;">📞 ${businessPhone}</p>
-              <p style="margin:16px 0 0 0;font-size:11px;color:#aaa;line-height:1.4;">This email was sent in response to your inquiry. If you did not contact us, please disregard this message.</p>
+              ${statusUrl ? `<p style="margin:16px 0 0 0;font-size:12px;"><a href="${statusUrl}" style="color:#185FA5;text-decoration:none;font-weight:500;">📋 Check your case status →</a></p>` : ''}
+              <p style="margin:${statusUrl ? '8' : '16'}px 0 0 0;font-size:11px;color:#aaa;line-height:1.4;">This email was sent in response to your inquiry. If you did not contact us, please disregard this message.</p>
             </td>
           </tr>
 
