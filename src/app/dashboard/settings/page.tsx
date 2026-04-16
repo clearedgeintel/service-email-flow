@@ -70,6 +70,15 @@ const SETTING_GROUPS = [
       { key: 'retell_api_key', label: 'Retell API Key', type: 'password' },
       { key: 'retell_inbound_agent_id', label: 'Inbound Agent ID', type: 'text' },
       { key: 'retell_outbound_agent_id', label: 'Outbound Agent ID', type: 'text' },
+      { key: 'retell_after_hours_agent_id', label: 'After-hours Agent ID (optional)', type: 'text' },
+    ],
+  },
+  {
+    title: 'Business Hours',
+    fields: [
+      { key: 'business_hours_start', label: 'Start (HH:MM, 24h)', type: 'text' },
+      { key: 'business_hours_end', label: 'End (HH:MM, 24h)', type: 'text' },
+      { key: 'business_hours_weekdays', label: 'Open days (ISO 1=Mon..7=Sun, e.g. [1,2,3,4,5])', type: 'text' },
     ],
   },
 ];
@@ -662,6 +671,24 @@ export default function SettingsPage() {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.retell_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.retell_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Business hours</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {settings.business_hours_enabled === 'true'
+                    ? 'Inbound voice calls outside hours are flagged and (if configured) routed to the after-hours agent. Outbound calls from the dashboard are blocked unless forced.'
+                    : 'Disabled — treated as always open. Inbound calls use the default agent; outbound calls are never blocked.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, business_hours_enabled: settings.business_hours_enabled === 'true' ? 'false' : 'true' })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.business_hours_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.business_hours_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
           </div>

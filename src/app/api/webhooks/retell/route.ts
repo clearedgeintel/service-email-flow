@@ -4,6 +4,7 @@ import { createChildLogger } from '@/lib/logger';
 import {
   verifyRetellSignature,
   processRetellWebhook,
+  buildInboundResponse,
   getRetellApiKey,
   isRetellEnabled,
   RetellWebhookPayload,
@@ -45,8 +46,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  if (!webhook.event || !webhook.call?.call_id) {
-    return NextResponse.json({ error: 'Missing event or call data' }, { status: 400 });
+  if (!webhook.event) {
+    return NextResponse.json({ error: 'Missing event' }, { status: 400 });
+  }
+
+  // call_inbound fires before Retell answers the call — Retell expects a
+  // response containing dynamic_variables and optional override_agent_id.
+  if (webhook.event === 'call_inbound') {
+    try {
+      const response = await buildInboundResponse(webhook.call_inbound?.from_number);
+      log.info(
+        { from: webhook.call_inbound?.from_number, override: response.call_inbound.override_agent_id },
+        'Retell call_inbound handled',
+      );
+      return NextResponse.json(response);
+    } catch (e) {
+      log.error({ err: e }, 'Failed to build call_inbound response');
+      // Return empty response so Retell falls back to default agent
+      return NextResponse.json({ call_inbound: {} });
+    }
+  }
+
+  if (!webhook.call?.call_id) {
+    return NextResponse.json({ error: 'Missing call data' }, { status: 400 });
   }
 
   try {

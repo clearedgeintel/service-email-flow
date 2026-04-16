@@ -4,10 +4,15 @@ import { getConfig } from '@/lib/config';
 import { createChildLogger } from '@/lib/logger';
 import { logCaseEvent } from './case-event.service';
 import { EventType } from '@/types/events';
+import {
+  getBusinessHoursConfig,
+  isAfterHours,
+  describeBusinessHours,
+} from '@/lib/business-hours';
 
 const log = createChildLogger('retell');
 
-export type RetellEventType = 'call_started' | 'call_ended' | 'call_analyzed';
+export type RetellEventType = 'call_inbound' | 'call_started' | 'call_ended' | 'call_analyzed';
 
 interface RetellCallPayload {
   call_type?: string;
@@ -37,6 +42,82 @@ interface RetellCallPayload {
 export interface RetellWebhookPayload {
   event: RetellEventType;
   call: RetellCallPayload;
+  // For call_inbound events Retell sends `call_inbound` instead of `call`.
+  call_inbound?: {
+    agent_id?: string;
+    from_number?: string;
+    to_number?: string;
+  };
+}
+
+export interface RetellInboundResponse {
+  call_inbound: {
+    override_agent_id?: string;
+    dynamic_variables?: Record<string, string>;
+    metadata?: Record<string, unknown>;
+  };
+}
+
+/**
+ * Build the response payload for Retell's `call_inbound` event. Retell sends
+ * this right before answering the call — our response can override the agent
+ * (e.g. after-hours voicemail agent) and inject dynamic variables that the
+ * agent's prompt references at runtime.
+ */
+export async function buildInboundResponse(
+  fromNumber: string | undefined,
+): Promise<RetellInboundResponse> {
+  const [
+    businessName,
+    businessPhone,
+    afterHoursAgentId,
+    hoursConfig,
+  ] = await Promise.all([
+    getConfig<string>('business_name', 'ClearDesk'),
+    getConfig<string>('business_phone', ''),
+    getConfig<string>('retell_after_hours_agent_id', ''),
+    getBusinessHoursConfig(),
+  ]);
+
+  const afterHours = isAfterHours(hoursConfig);
+
+  // Try to look up caller by phone so the agent can greet them by name
+  let callerName = '';
+  if (fromNumber) {
+    const caseId = await findCaseForCall(fromNumber);
+    if (caseId) {
+      const { data } = await getSupabase()
+        .from('email_cases')
+        .select('customer_name')
+        .eq('id', caseId)
+        .single();
+      if (data && (data as { customer_name: string | null }).customer_name) {
+        callerName = (data as { customer_name: string }).customer_name;
+      }
+    }
+  }
+
+  const response: RetellInboundResponse = {
+    call_inbound: {
+      dynamic_variables: {
+        business_name: businessName,
+        business_phone: businessPhone,
+        business_hours: describeBusinessHours(hoursConfig),
+        is_after_hours: String(afterHours),
+        known_caller_name: callerName,
+      },
+      metadata: {
+        cleardesk_source: 'inbound',
+        after_hours: afterHours,
+      },
+    },
+  };
+
+  if (afterHours && afterHoursAgentId) {
+    response.call_inbound.override_agent_id = afterHoursAgentId;
+  }
+
+  return response;
 }
 
 /** Verify Retell webhook signature using their SDK helper */
@@ -214,8 +295,19 @@ export async function processRetellWebhook(payload: RetellWebhookPayload): Promi
     const caseId = direction === 'inbound'
       ? await findCaseForCall(call.from_number)
       : null;
-    await upsertCall(call, caseId, { status: 'in_progress' });
-    log.info({ callId: call.call_id, direction, caseId }, 'Retell call started');
+
+    // Flag inbound calls that arrive outside business hours for reporting
+    const updates: Record<string, unknown> = { status: 'in_progress' };
+    if (direction === 'inbound') {
+      const hoursConfig = await getBusinessHoursConfig();
+      updates.after_hours = isAfterHours(
+        hoursConfig,
+        call.start_timestamp ? new Date(call.start_timestamp) : new Date(),
+      );
+    }
+
+    await upsertCall(call, caseId, updates);
+    log.info({ callId: call.call_id, direction, caseId, afterHours: updates.after_hours }, 'Retell call started');
     return { handled: true, caseId, callId: call.call_id, action: 'started' };
   }
 

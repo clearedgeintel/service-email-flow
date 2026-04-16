@@ -529,9 +529,37 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 <ActionButton
                   icon={PhoneCall}
                   label="Call Customer"
-                  onClick={() => {
-                    if (confirm(`Trigger an outbound Retell call to ${c.customer_phone}?`)) {
-                      runAction('call-customer');
+                  onClick={async () => {
+                    if (!confirm(`Trigger an outbound Retell call to ${c.customer_phone}?`)) return;
+                    setActionLoading('call-customer');
+                    setActionResult(null);
+                    try {
+                      let res = await fetch(`/api/cases/${id}/call-customer`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                      });
+                      if (res.status === 409) {
+                        const data = await res.json().catch(() => null);
+                        if (data?.after_hours && confirm('Outside configured business hours. Call anyway?')) {
+                          res = await fetch(`/api/cases/${id}/call-customer`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ force: true }),
+                          });
+                        } else {
+                          setActionResult('✗ Outside business hours');
+                          return;
+                        }
+                      }
+                      const data = await res.json().catch(() => null);
+                      if (res.ok) {
+                        if (data?.message) setActionResult(`✓ ${data.message}`);
+                        await fetchCase();
+                      } else {
+                        setActionResult(`✗ ${data?.error || 'Call failed'}`);
+                      }
+                    } finally {
+                      setActionLoading('');
                     }
                   }}
                   loading={actionLoading === 'call-customer'}

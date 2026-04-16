@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
 import { getConfig } from '@/lib/config';
 import { getRetellApiKey, isRetellEnabled } from '@/services/retell.service';
+import { getBusinessHoursConfig, isAfterHours } from '@/lib/business-hours';
 import { logCaseEvent } from '@/services/case-event.service';
 import { EventType } from '@/types/events';
 import { createChildLogger } from '@/lib/logger';
@@ -11,11 +12,31 @@ import { createChildLogger } from '@/lib/logger';
 const log = createChildLogger('outbound-call');
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const authError = await requireAuth();
   if (authError) return authError;
+
+  // Respect business hours — admin can force by POSTing { force: true }
+  let force = false;
+  try {
+    const body = await request.clone().json();
+    force = body?.force === true;
+  } catch { /* empty body is fine */ }
+
+  if (!force) {
+    const hoursConfig = await getBusinessHoursConfig();
+    if (isAfterHours(hoursConfig)) {
+      return NextResponse.json(
+        {
+          error: 'Outside configured business hours. Re-submit with { "force": true } to call anyway.',
+          after_hours: true,
+        },
+        { status: 409 },
+      );
+    }
+  }
 
   const enabled = await isRetellEnabled();
   if (!enabled) {

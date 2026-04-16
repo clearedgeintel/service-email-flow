@@ -13,6 +13,12 @@ vi.mock('./case-event.service', () => ({
   logCaseEvent: vi.fn(),
 }));
 
+vi.mock('@/lib/business-hours', () => ({
+  getBusinessHoursConfig: vi.fn(),
+  isAfterHours: vi.fn(),
+  describeBusinessHours: vi.fn(() => 'Mon-Fri 08:00-17:00 America/New_York'),
+}));
+
 vi.mock('@/lib/logger', () => ({
   createChildLogger: () => ({
     info: vi.fn(),
@@ -39,16 +45,26 @@ import {
   processRetellWebhook,
   isRetellEnabled,
   extractTranscriptTurns,
+  buildInboundResponse,
 } from './retell.service';
 import { getSupabase } from '@/lib/supabase';
 import { getConfig } from '@/lib/config';
+import { getBusinessHoursConfig, isAfterHours } from '@/lib/business-hours';
 
 const mockedGetSupabase = vi.mocked(getSupabase);
 const mockedGetConfig = vi.mocked(getConfig);
 const mockedVerify = vi.mocked(Retell.verify);
+const mockedHoursConfig = vi.mocked(getBusinessHoursConfig);
+const mockedIsAfterHours = vi.mocked(isAfterHours);
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  // Default: business hours disabled so isAfterHours returns false
+  mockedHoursConfig.mockResolvedValue({
+    enabled: false, start: '08:00', end: '17:00',
+    weekdays: [1, 2, 3, 4, 5], timezone: 'America/New_York',
+  });
+  mockedIsAfterHours.mockReturnValue(false);
 });
 
 describe('verifyRetellSignature', () => {
@@ -91,6 +107,110 @@ describe('isRetellEnabled', () => {
   it('returns false when setting is string "false"', async () => {
     mockedGetConfig.mockResolvedValue('false');
     expect(await isRetellEnabled()).toBe(false);
+  });
+});
+
+describe('buildInboundResponse', () => {
+  it('returns dynamic variables pulled from settings + business hours', async () => {
+    mockedGetConfig.mockImplementation(async (key: string) => {
+      const vals: Record<string, string> = {
+        business_name: 'ACME HVAC',
+        business_phone: '+15551112222',
+        retell_after_hours_agent_id: '',
+      };
+      return vals[key] ?? '';
+    });
+    mockedHoursConfig.mockResolvedValue({
+      enabled: true, start: '08:00', end: '17:00',
+      weekdays: [1, 2, 3, 4, 5], timezone: 'America/New_York',
+    });
+    mockedIsAfterHours.mockReturnValue(false);
+
+    // no caller match — findCaseForCall returns null via empty query
+    const mockSb = createMockSupabase();
+    mockSb.from.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        not: vi.fn().mockReturnValue({
+          not: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [] }),
+            }),
+          }),
+        }),
+      }),
+    });
+    mockedGetSupabase.mockReturnValue(mockSb as any);
+
+    const resp = await buildInboundResponse('+15559998888');
+    expect(resp.call_inbound.dynamic_variables).toMatchObject({
+      business_name: 'ACME HVAC',
+      business_phone: '+15551112222',
+      is_after_hours: 'false',
+    });
+    expect(resp.call_inbound.override_agent_id).toBeUndefined();
+    expect(resp.call_inbound.metadata).toMatchObject({ after_hours: false });
+  });
+
+  it('sets override_agent_id to after-hours agent when after hours + configured', async () => {
+    mockedGetConfig.mockImplementation(async (key: string) => {
+      const vals: Record<string, string> = {
+        business_name: 'ACME',
+        business_phone: '',
+        retell_after_hours_agent_id: 'agent_night_1',
+      };
+      return vals[key] ?? '';
+    });
+    mockedHoursConfig.mockResolvedValue({
+      enabled: true, start: '08:00', end: '17:00',
+      weekdays: [1, 2, 3, 4, 5], timezone: 'America/New_York',
+    });
+    mockedIsAfterHours.mockReturnValue(true);
+
+    const mockSb = createMockSupabase();
+    mockSb.from.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        not: vi.fn().mockReturnValue({
+          not: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [] }),
+            }),
+          }),
+        }),
+      }),
+    });
+    mockedGetSupabase.mockReturnValue(mockSb as any);
+
+    const resp = await buildInboundResponse('+15559998888');
+    expect(resp.call_inbound.override_agent_id).toBe('agent_night_1');
+    expect(resp.call_inbound.dynamic_variables?.is_after_hours).toBe('true');
+    expect(resp.call_inbound.metadata).toMatchObject({ after_hours: true });
+  });
+
+  it('omits override when after hours but no after-hours agent configured', async () => {
+    mockedGetConfig.mockResolvedValue('');
+    mockedHoursConfig.mockResolvedValue({
+      enabled: true, start: '08:00', end: '17:00',
+      weekdays: [1, 2, 3, 4, 5], timezone: 'America/New_York',
+    });
+    mockedIsAfterHours.mockReturnValue(true);
+
+    const mockSb = createMockSupabase();
+    mockSb.from.mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        not: vi.fn().mockReturnValue({
+          not: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [] }),
+            }),
+          }),
+        }),
+      }),
+    });
+    mockedGetSupabase.mockReturnValue(mockSb as any);
+
+    const resp = await buildInboundResponse('+15559998888');
+    expect(resp.call_inbound.override_agent_id).toBeUndefined();
+    expect(resp.call_inbound.dynamic_variables?.is_after_hours).toBe('true');
   });
 });
 
