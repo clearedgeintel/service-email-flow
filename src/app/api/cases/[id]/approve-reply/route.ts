@@ -110,5 +110,13 @@ export async function POST(
       : 'Draft approved and sent by admin',
   });
 
+  // Emit webhook event (replied triggers on both initial draft approval and followup send)
+  const { emitWebhookEvent } = await import('@/services/webhook.service');
+  emitWebhookEvent('case.replied', caseId, {
+    to: draft.to,
+    mode: 'draft_approved',
+    is_followup: isFollowup,
+  });
+
   return NextResponse.json({ success: true });
 }

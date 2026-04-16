@@ -243,11 +243,16 @@ Core workflow that predates this roadmap:
 
 ### 8.5 Integrations
 - [x] Cal.com webhook integration (booking tracking, auto-close on meeting end)
-- [ ] Webhook system (notify external services on case events)
-- [ ] Zapier / Make integration
-- [ ] QuickBooks / invoice generation
+- [x] Generic outbound webhook system (migration 012, webhook.service,
+  webhook-dispatch worker): admin-configured subscriptions receive HMAC-SHA256
+  signed POSTs for `case.created`, `case.classified`, `case.routed`,
+  `case.escalated`, `case.replied`, `case.booked`, `case.closed`,
+  `case.note_added`. 4 retries with exponential backoff, delivery log,
+  per-subscription test trigger, Settings → Webhooks tab
+- [x] Zapier / Make integration — via the generic webhook system
+- [ ] QuickBooks / invoice generation — via webhook → Zapier/n8n → QuickBooks
 - [ ] Google Calendar sync for booked appointments
-- [ ] CRM integration (HubSpot, Salesforce)
+- [ ] CRM integration (HubSpot, Salesforce) — via webhook → Zapier/n8n → CRM
 
 ---
 

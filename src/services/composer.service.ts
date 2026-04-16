@@ -211,6 +211,18 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
       used_fallback: usedFallback,
     },
   });
+
+  // Only emit case.replied when actually sent (not for drafts awaiting approval)
+  if (shouldSendNow) {
+    const { emitWebhookEvent } = await import('./webhook.service');
+    emitWebhookEvent('case.replied', caseId, {
+      to: customerEmail,
+      is_emergency: isEmergency,
+      has_pricing: hasPricing,
+      used_fallback: usedFallback,
+      slot_options_offered: slotOptions?.length || 0,
+    });
+  }
 }
 
 async function selectCalcomLink(

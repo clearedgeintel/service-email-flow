@@ -12,6 +12,7 @@ export const QUEUE_NAMES = {
   FOLLOWUP: 'followup',
   DIGEST: 'digest',
   ERROR_ALERT: 'error-alert',
+  WEBHOOK_DISPATCH: 'webhook-dispatch',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -26,6 +27,13 @@ export interface ErrorAlertJobData {
   jobId: string;
   errorMessage: string;
   timestamp: string;
+}
+
+export interface WebhookDispatchJobData {
+  subscriptionId: number;
+  eventType: string;
+  caseId: number | null;
+  payload: Record<string, unknown>;
 }
 
 const queues = new Map<string, Queue>();

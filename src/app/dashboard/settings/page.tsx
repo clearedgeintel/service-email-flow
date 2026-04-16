@@ -73,7 +73,21 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<'config' | 'pricing' | 'templates'>('config');
+  const [tab, setTab] = useState<'config' | 'pricing' | 'templates' | 'webhooks'>('config');
+  const [webhooks, setWebhooks] = useState<Array<{
+    id: number;
+    name: string;
+    url: string;
+    secret: string;
+    events: string[];
+    active: boolean;
+    description: string | null;
+    created_at: string;
+  }>>([]);
+  const [availableEvents, setAvailableEvents] = useState<string[]>([]);
+  const [newWebhook, setNewWebhook] = useState<{ name: string; url: string; events: string[]; description: string }>({ name: '', url: '', events: [], description: '' });
+  const [webhookTestResult, setWebhookTestResult] = useState<Record<number, string>>({});
+  const [revealedSecrets, setRevealedSecrets] = useState<Record<number, boolean>>({});
   const [templates, setTemplates] = useState<Array<{
     key: string;
     label: string;
@@ -117,7 +131,8 @@ export default function SettingsPage() {
       }),
       fetch('/api/pricing').then((r) => r.json()),
       fetch('/api/templates').then((r) => r.ok ? r.json() : { templates: [] }),
-    ]).then(([settingsData, pricingData, templatesData]) => {
+      fetch('/api/webhooks').then((r) => r.ok ? r.json() : { subscriptions: [], available_events: [] }),
+    ]).then(([settingsData, pricingData, templatesData, webhooksData]) => {
       if (settingsData) {
         // Flatten JSONB values
         const flat: Record<string, string> = {};
@@ -128,9 +143,61 @@ export default function SettingsPage() {
       }
       setPricing(pricingData?.items || []);
       setTemplates(templatesData?.templates || []);
+      setWebhooks(webhooksData?.subscriptions || []);
+      setAvailableEvents(webhooksData?.available_events || []);
       setLoading(false);
     });
   }, [router]);
+
+  const createWebhook = async () => {
+    if (!newWebhook.name || !newWebhook.url || newWebhook.events.length === 0) return;
+    const res = await fetch('/api/webhooks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newWebhook),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setWebhooks([data.subscription, ...webhooks]);
+      setNewWebhook({ name: '', url: '', events: [], description: '' });
+      setRevealedSecrets({ ...revealedSecrets, [data.subscription.id]: true });
+    }
+  };
+
+  const toggleWebhookActive = async (id: number, active: boolean) => {
+    const res = await fetch(`/api/webhooks/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setWebhooks(webhooks.map((w) => (w.id === id ? data.subscription : w)));
+    }
+  };
+
+  const deleteWebhook = async (id: number) => {
+    if (!confirm('Delete this webhook? Any queued deliveries will be lost.')) return;
+    const res = await fetch(`/api/webhooks/${id}`, { method: 'DELETE' });
+    if (res.ok) setWebhooks(webhooks.filter((w) => w.id !== id));
+  };
+
+  const testWebhook = async (id: number) => {
+    setWebhookTestResult({ ...webhookTestResult, [id]: 'Sending...' });
+    const res = await fetch(`/api/webhooks/${id}/test`, { method: 'POST' });
+    const data = await res.json();
+    setWebhookTestResult({
+      ...webhookTestResult,
+      [id]: res.ok ? `✓ ${data.message || 'Test queued'}` : `✗ ${data.error || 'Failed'}`,
+    });
+    setTimeout(() => {
+      setWebhookTestResult((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }, 6000);
+  };
 
   const saveTemplate = async (key: string) => {
     const draft = templateDrafts[key];
@@ -259,7 +326,150 @@ export default function SettingsPage() {
         >
           Email Templates
         </button>
+        <button
+          onClick={() => setTab('webhooks')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'webhooks' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          Webhooks
+        </button>
       </div>
+
+      {tab === 'webhooks' && (
+        <div className="space-y-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-900">
+            <p className="font-medium mb-1">Outbound webhooks</p>
+            <p className="text-blue-800">
+              ClearDesk sends signed HTTP POSTs to your endpoints when case events happen.
+              Use this to connect Zapier, n8n, CRMs, or any custom service. Each webhook
+              gets a unique secret — verify the <code className="bg-blue-100 px-1 rounded">X-ClearDesk-Signature-256</code>
+              header (HMAC-SHA256 of the raw body) on your end.
+            </p>
+          </div>
+
+          {/* Create new */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="font-semibold text-gray-900 mb-3">Add Webhook</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                placeholder="Name (e.g. Zapier - New cases)"
+                value={newWebhook.name}
+                onChange={(e) => setNewWebhook({ ...newWebhook, name: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+              />
+              <input
+                type="url"
+                placeholder="https://hooks.example.com/..."
+                value={newWebhook.url}
+                onChange={(e) => setNewWebhook({ ...newWebhook, url: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+              />
+              <input
+                type="text"
+                placeholder="Description (optional)"
+                value={newWebhook.description}
+                onChange={(e) => setNewWebhook({ ...newWebhook, description: e.target.value })}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 col-span-full"
+              />
+            </div>
+            <div className="mt-3">
+              <p className="text-xs font-medium text-gray-600 mb-2">Events to subscribe to:</p>
+              <div className="flex flex-wrap gap-2">
+                {availableEvents.map((ev) => (
+                  <label key={ev} className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2 py-1 cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={newWebhook.events.includes(ev)}
+                      onChange={(e) => {
+                        const events = e.target.checked
+                          ? [...newWebhook.events, ev]
+                          : newWebhook.events.filter((x) => x !== ev);
+                        setNewWebhook({ ...newWebhook, events });
+                      }}
+                    />
+                    <code className="font-mono">{ev}</code>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={createWebhook}
+              disabled={!newWebhook.name || !newWebhook.url || newWebhook.events.length === 0}
+              className="mt-4 px-4 py-2 bg-[#185FA5] text-white rounded-lg text-sm font-medium hover:bg-[#0C447C] disabled:opacity-50"
+            >
+              Create webhook
+            </button>
+          </div>
+
+          {/* Existing webhooks */}
+          {webhooks.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500 text-sm">
+              No webhooks configured yet.
+            </div>
+          ) : (
+            webhooks.map((w) => (
+              <div key={w.id} className={`bg-white border rounded-xl p-5 ${w.active ? 'border-gray-200' : 'border-gray-200 opacity-60'}`}>
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-gray-900">{w.name}</h3>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${w.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+                        {w.active ? 'active' : 'disabled'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 break-all">{w.url}</p>
+                    {w.description && <p className="text-xs text-gray-500 mt-1">{w.description}</p>}
+                  </div>
+                  <div className="flex gap-1 ml-2 shrink-0">
+                    <button
+                      onClick={() => testWebhook(w.id)}
+                      className="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                    >
+                      Test
+                    </button>
+                    <button
+                      onClick={() => toggleWebhookActive(w.id, !w.active)}
+                      className="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                    >
+                      {w.active ? 'Disable' : 'Enable'}
+                    </button>
+                    <button
+                      onClick={() => deleteWebhook(w.id)}
+                      className="px-2 py-1 text-xs border border-red-200 text-red-700 rounded hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {w.events.map((ev) => (
+                    <code key={ev} className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-[11px] font-mono">{ev}</code>
+                  ))}
+                </div>
+
+                <div className="mt-3 text-xs">
+                  <button
+                    onClick={() => setRevealedSecrets({ ...revealedSecrets, [w.id]: !revealedSecrets[w.id] })}
+                    className="text-gray-500 hover:text-gray-700 underline"
+                  >
+                    {revealedSecrets[w.id] ? 'Hide' : 'Show'} signing secret
+                  </button>
+                  {revealedSecrets[w.id] && (
+                    <code className="block mt-1 p-2 bg-gray-50 border border-gray-200 rounded font-mono text-[11px] text-gray-700 break-all">
+                      {w.secret}
+                    </code>
+                  )}
+                </div>
+
+                {webhookTestResult[w.id] && (
+                  <p className="mt-2 text-xs text-gray-600">{webhookTestResult[w.id]}</p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {tab === 'templates' && (
         <div className="space-y-4">

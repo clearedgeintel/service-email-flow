@@ -52,5 +52,8 @@ export async function POST(
     summary: note.substring(0, 200),
   });
 
+  const { emitWebhookEvent } = await import('@/services/webhook.service');
+  emitWebhookEvent('case.note_added', caseId, { note });
+
   return NextResponse.json({ success: true });
 }

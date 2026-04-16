@@ -46,5 +46,8 @@ export async function POST(
     summary: 'Manually escalated to EMERGENCY',
   });
 
+  const { emitWebhookEvent } = await import('@/services/webhook.service');
+  emitWebhookEvent('case.escalated', caseId, { escalated_by: 'admin' });
+
   return NextResponse.json({ success: true, message: 'Case escalated' });
 }

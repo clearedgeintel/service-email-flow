@@ -199,6 +199,18 @@ Return ONLY the JSON object. No other text whatsoever.`;
     },
   });
 
+  // Emit webhook event
+  const { emitWebhookEvent } = await import('./webhook.service');
+  emitWebhookEvent('case.classified', caseId, {
+    intent: parsed.intent,
+    confidence: parsed.confidence,
+    urgency_level: parsed.urgency_level,
+    trade: parsed.trade,
+    sentiment_label: parsed.sentiment_label,
+    sentiment_score: parsed.sentiment_score,
+    status: newStatus,
+  });
+
   log.info(
     {
       caseId,

@@ -190,6 +190,15 @@ export async function deduplicateAndStore(emails: NormalizedEmail[]): Promise<nu
       await syncMessageLabel(email.gmail_message_id, 'RECEIVED');
       await markAsRead(email.gmail_message_id);
 
+      // Emit webhook event
+      const { emitWebhookEvent } = await import('./webhook.service');
+      emitWebhookEvent('case.created', inserted.id, {
+        from_email: email.from_email,
+        from_name: email.from_name,
+        subject: email.subject,
+        snippet: email.snippet,
+      });
+
       log.info(
         { caseId: inserted.id, from: maskEmail(email.from_email) },
         'New case ingested',

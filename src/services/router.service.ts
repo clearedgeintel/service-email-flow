@@ -117,6 +117,24 @@ export async function routeCase(caseId: number): Promise<RoutingDecision> {
     },
   });
 
+  // Emit webhook events (routed is always, escalated only when status is ESCALATED)
+  const { emitWebhookEvent } = await import('./webhook.service');
+  emitWebhookEvent('case.routed', caseId, {
+    new_status: decision.newStatus,
+    intent: row.intent,
+    urgency_level: row.urgency_level,
+    trade: row.trade,
+    requires_customer_reply: decision.requiresCustomerReply,
+    requires_tech_notify: decision.requiresTechNotify,
+  });
+  if (decision.newStatus === 'ESCALATED') {
+    emitWebhookEvent('case.escalated', caseId, {
+      reason: decision.routeReason,
+      urgency_level: row.urgency_level,
+      trade: row.trade,
+    });
+  }
+
   log.info(
     {
       caseId,

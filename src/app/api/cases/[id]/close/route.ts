@@ -37,5 +37,8 @@ export async function POST(
     summary: 'Case manually closed',
   });
 
+  const { emitWebhookEvent } = await import('@/services/webhook.service');
+  emitWebhookEvent('case.closed', caseId, { closed_by: 'admin' });
+
   return NextResponse.json({ success: true, message: 'Case closed' });
 }

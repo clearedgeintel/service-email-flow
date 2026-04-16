@@ -185,6 +185,24 @@ export async function processCalcomWebhook(webhook: CalcomWebhookPayload): Promi
     },
   });
 
+  // Emit outbound webhook events so integrations (Zapier, n8n, CRMs) can react
+  const { emitWebhookEvent } = await import('./webhook.service');
+  if (webhook.triggerEvent === 'BOOKING_CREATED' || webhook.triggerEvent === 'BOOKING_RESCHEDULED') {
+    emitWebhookEvent('case.booked', caseId, {
+      booking_id: booking.uid,
+      start_time: booking.startTime,
+      end_time: booking.endTime,
+      attendee_email: booking.attendeeEmail,
+      is_reschedule: webhook.triggerEvent === 'BOOKING_RESCHEDULED',
+    });
+  }
+  if (webhook.triggerEvent === 'MEETING_ENDED') {
+    emitWebhookEvent('case.closed', caseId, {
+      closed_by: 'calcom_meeting_ended',
+      booking_id: booking.uid,
+    });
+  }
+
   log.info(
     { caseId, event: webhook.triggerEvent, bookingId: booking.uid },
     'Cal.com webhook processed',
