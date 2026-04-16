@@ -73,6 +73,51 @@ export async function GET(request: NextRequest) {
     ? Math.round(totalResponseTimeMs / responseCount / 60000)
     : null;
 
+  // Voice call stats in same date range
+  const { data: calls } = await supabase
+    .from('calls')
+    .select('direction, sentiment, duration_seconds, started_at, in_voicemail, call_successful')
+    .gte('started_at', from)
+    .lte('started_at', to);
+
+  const voiceData = calls || [];
+  let totalDurationSec = 0;
+  let durationCount = 0;
+  let voicemailCount = 0;
+  let successfulCount = 0;
+  let successfulTotal = 0;
+  const callsByDirection: Record<string, number> = { inbound: 0, outbound: 0 };
+  const callsBySentiment: Record<string, number> = {};
+
+  for (const call of voiceData as Array<{
+    direction: string;
+    sentiment: string | null;
+    duration_seconds: number | null;
+    in_voicemail: boolean | null;
+    call_successful: boolean | null;
+  }>) {
+    callsByDirection[call.direction] = (callsByDirection[call.direction] || 0) + 1;
+    if (call.sentiment) callsBySentiment[call.sentiment] = (callsBySentiment[call.sentiment] || 0) + 1;
+    if (call.duration_seconds) {
+      totalDurationSec += call.duration_seconds;
+      durationCount++;
+    }
+    if (call.in_voicemail) voicemailCount++;
+    if (typeof call.call_successful === 'boolean') {
+      successfulTotal++;
+      if (call.call_successful) successfulCount++;
+    }
+  }
+
+  const voice = {
+    totalCalls: voiceData.length,
+    byDirection: callsByDirection,
+    bySentiment: callsBySentiment,
+    avgDurationSec: durationCount > 0 ? Math.round(totalDurationSec / durationCount) : null,
+    voicemailRate: voiceData.length > 0 ? Math.round((voicemailCount / voiceData.length) * 100) : null,
+    successRate: successfulTotal > 0 ? Math.round((successfulCount / successfulTotal) * 100) : null,
+  };
+
   return NextResponse.json({
     totalCases: all.length,
     byStatus,
@@ -85,6 +130,7 @@ export async function GET(request: NextRequest) {
       ? Math.round((followupConversions / followupTotal) * 100)
       : null,
     stuckCount: stuckCount || 0,
+    voice,
     dateRange: { from, to },
   });
 }
