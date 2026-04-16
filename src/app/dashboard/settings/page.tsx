@@ -74,6 +74,14 @@ const SETTING_GROUPS = [
     ],
   },
   {
+    title: 'Twilio SMS',
+    fields: [
+      { key: 'twilio_account_sid', label: 'Account SID', type: 'text' },
+      { key: 'twilio_auth_token', label: 'Auth Token', type: 'password' },
+      { key: 'twilio_from_number', label: 'From Number', type: 'text' },
+    ],
+  },
+  {
     title: 'Business Hours',
     fields: [
       { key: 'business_hours_start', label: 'Start (HH:MM, 24h)', type: 'text' },
@@ -699,6 +707,24 @@ export default function SettingsPage() {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.retell_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.retell_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Twilio SMS</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {settings.twilio_enabled === 'true'
+                    ? 'Inbound SMS creates/updates cases. Outbound SMS triggerable from case detail. Point Twilio number webhook to /api/webhooks/twilio/sms and status callback to /api/webhooks/twilio/status.'
+                    : 'Disabled — SMS is not processed. Enable and configure Account SID + Auth Token + From Number below.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, twilio_enabled: settings.twilio_enabled === 'true' ? 'false' : 'true' })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.twilio_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.twilio_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
 

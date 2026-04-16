@@ -7,6 +7,7 @@ import { StatusBadge, UrgencyBadge, IntentBadge } from '@/components/status-badg
 import {
   ArrowLeft, RefreshCw, Send, AlertTriangle, X, MessageSquare, Clock,
   User, Mail, Phone, MapPin, FileText, Calendar, CheckCircle2, PhoneCall,
+  MessageCircle,
 } from 'lucide-react';
 
 interface CallRecord {
@@ -28,6 +29,24 @@ interface CallRecord {
   call_successful: boolean | null;
   in_voicemail: boolean | null;
   custom_data: Record<string, unknown> | null;
+}
+
+interface SmsMessage {
+  id: number;
+  twilio_sid: string;
+  direction: 'inbound' | 'outbound';
+  status: string;
+  from_number: string;
+  to_number: string;
+  body: string | null;
+  num_media: number;
+  media_urls: string[] | null;
+  error_code: string | null;
+  error_message: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  received_at: string | null;
+  created_at: string;
 }
 
 interface CaseDetail {
@@ -93,6 +112,10 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [expandedCall, setExpandedCall] = useState<number | null>(null);
+  const [messages, setMessages] = useState<SmsMessage[]>([]);
+  const [smsBody, setSmsBody] = useState('');
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsError, setSmsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState('');
   const [actionResult, setActionResult] = useState<string | null>(null);
@@ -102,9 +125,10 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
   const fetchCase = async () => {
     try {
-      const [caseRes, callsRes] = await Promise.all([
+      const [caseRes, callsRes, msgRes] = await Promise.all([
         fetch(`/api/cases/${id}`),
         fetch(`/api/cases/${id}/calls`).catch(() => null),
+        fetch(`/api/cases/${id}/messages`).catch(() => null),
       ]);
       if (caseRes.status === 401) { router.push('/login'); return; }
       if (caseRes.status === 404) { router.push('/dashboard'); return; }
@@ -114,6 +138,10 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
       if (callsRes && callsRes.ok) {
         const callsData = await callsRes.json();
         setCalls(callsData.calls || []);
+      }
+      if (msgRes && msgRes.ok) {
+        const msgData = await msgRes.json();
+        setMessages(msgData.messages || []);
       }
     } catch { /* */ } finally {
       setLoading(false);
@@ -148,6 +176,28 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     if (!noteText.trim()) return;
     await runAction('add-note', { note: noteText });
     setNoteText('');
+  };
+
+  const sendSms = async () => {
+    if (!smsBody.trim()) return;
+    setSmsSending(true);
+    setSmsError(null);
+    try {
+      const res = await fetch(`/api/cases/${id}/send-sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: smsBody }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        setSmsBody('');
+        await fetchCase();
+      } else {
+        setSmsError(data?.error || 'Failed to send SMS');
+      }
+    } finally {
+      setSmsSending(false);
+    }
   };
 
   if (loading) {
@@ -454,6 +504,88 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* SMS Messages */}
+          {(messages.length > 0 || c.customer_phone) && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageCircle className="w-4 h-4 text-[#185FA5]" />
+                <h2 className="font-semibold text-gray-900">
+                  SMS {messages.length > 0 ? `(${messages.length})` : ''}
+                </h2>
+              </div>
+
+              {messages.length > 0 && (
+                <div className="space-y-2 mb-3 max-h-96 overflow-y-auto pr-1">
+                  {messages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[80%] px-3 py-2 rounded-lg border text-sm ${
+                          m.direction === 'outbound'
+                            ? 'bg-blue-50 text-blue-900 border-blue-100'
+                            : 'bg-gray-50 text-gray-900 border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 text-[10px] opacity-60 mb-0.5 uppercase tracking-wide">
+                          <span>{m.direction === 'outbound' ? 'Sent' : 'Received'}</span>
+                          <span>·</span>
+                          <span>{m.status}</span>
+                          {m.error_code && <span className="text-red-600">· {m.error_code}</span>}
+                        </div>
+                        <p className="whitespace-pre-wrap">{m.body || <em>(no body)</em>}</p>
+                        {m.media_urls && m.media_urls.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {m.media_urls.map((url, i) => (
+                              <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[11px] underline opacity-70">
+                                media-{i + 1}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-[10px] opacity-50 mt-1">
+                          {new Date(m.sent_at || m.received_at || m.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {c.customer_phone && (
+                <div className="border-t border-gray-100 pt-3">
+                  <label className="text-xs text-gray-500 mb-1 block">
+                    Send SMS to {c.customer_phone}
+                  </label>
+                  <div className="flex gap-2">
+                    <textarea
+                      value={smsBody}
+                      onChange={(e) => setSmsBody(e.target.value)}
+                      placeholder="Type a message..."
+                      maxLength={1600}
+                      rows={2}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 outline-none"
+                      disabled={smsSending}
+                    />
+                    <button
+                      onClick={sendSms}
+                      disabled={smsSending || !smsBody.trim()}
+                      className="px-4 py-2 bg-[#185FA5] text-white rounded-lg text-sm hover:bg-[#0C447C] disabled:opacity-50 flex items-center gap-1.5 self-stretch"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {smsSending ? 'Sending' : 'Send'}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-[11px] text-gray-400">{smsBody.length}/1600</span>
+                    {smsError && <span className="text-[11px] text-red-600">{smsError}</span>}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
