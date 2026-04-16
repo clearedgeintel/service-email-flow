@@ -11,6 +11,7 @@ export enum EventType {
   MANUAL_ACTION = 'MANUAL_ACTION',
   STATUS_CHANGED = 'STATUS_CHANGED',
   ERROR = 'ERROR',
+  VOICE_TRANSCRIPT = 'VOICE_TRANSCRIPT',
 }
 
 export interface CaseEvent {

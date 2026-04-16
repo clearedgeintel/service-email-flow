@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { Inbox, BarChart3, Settings, LogOut, Menu, X, Mail, Circle, Moon, Sun } from 'lucide-react';
+import { Inbox, BarChart3, Settings, LogOut, Menu, X, Mail, Circle, Moon, Sun, PhoneCall } from 'lucide-react';
 
 const THEME_KEY = 'cleardesk:theme';
 
@@ -28,6 +28,7 @@ function useTheme() {
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Cases', icon: Inbox },
+  { href: '/dashboard/calls', label: 'Calls', icon: PhoneCall },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];

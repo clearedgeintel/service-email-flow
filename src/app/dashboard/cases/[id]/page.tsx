@@ -6,8 +6,29 @@ import Link from 'next/link';
 import { StatusBadge, UrgencyBadge, IntentBadge } from '@/components/status-badge';
 import {
   ArrowLeft, RefreshCw, Send, AlertTriangle, X, MessageSquare, Clock,
-  User, Mail, Phone, MapPin, FileText, Calendar, CheckCircle2,
+  User, Mail, Phone, MapPin, FileText, Calendar, CheckCircle2, PhoneCall,
 } from 'lucide-react';
+
+interface CallRecord {
+  id: number;
+  retell_call_id: string;
+  direction: 'inbound' | 'outbound';
+  status: string;
+  from_number: string | null;
+  to_number: string | null;
+  caller_name: string | null;
+  started_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number | null;
+  disconnection_reason: string | null;
+  transcript: string | null;
+  recording_url: string | null;
+  summary: string | null;
+  sentiment: string | null;
+  call_successful: boolean | null;
+  in_voicemail: boolean | null;
+  custom_data: Record<string, unknown> | null;
+}
 
 interface CaseDetail {
   id: number;
@@ -70,20 +91,30 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [expandedCall, setExpandedCall] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState('');
+  const [actionResult, setActionResult] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
   const [showDraftHtml, setShowDraftHtml] = useState(false);
 
   const fetchCase = async () => {
     try {
-      const res = await fetch(`/api/cases/${id}`);
-      if (res.status === 401) { router.push('/login'); return; }
-      if (res.status === 404) { router.push('/dashboard'); return; }
-      const data = await res.json();
+      const [caseRes, callsRes] = await Promise.all([
+        fetch(`/api/cases/${id}`),
+        fetch(`/api/cases/${id}/calls`).catch(() => null),
+      ]);
+      if (caseRes.status === 401) { router.push('/login'); return; }
+      if (caseRes.status === 404) { router.push('/dashboard'); return; }
+      const data = await caseRes.json();
       setCaseData(data.case);
       setTimeline(data.timeline || []);
+      if (callsRes && callsRes.ok) {
+        const callsData = await callsRes.json();
+        setCalls(callsData.calls || []);
+      }
     } catch { /* */ } finally {
       setLoading(false);
     }
@@ -93,17 +124,23 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
   const runAction = async (action: string, body?: object) => {
     setActionLoading(action);
+    setActionResult(null);
     try {
       const res = await fetch(`/api/cases/${id}/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: body ? JSON.stringify(body) : undefined,
       });
+      const data = await res.json().catch(() => null);
       if (res.ok) {
+        if (data?.message) setActionResult(`✓ ${data.message}`);
         await fetchCase();
+      } else {
+        setActionResult(`✗ ${data?.error || 'Action failed'}`);
       }
     } finally {
       setActionLoading('');
+      if (actionResult) setTimeout(() => setActionResult(null), 6000);
     }
   };
 
@@ -310,6 +347,116 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
+          {/* Calls */}
+          {calls.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <PhoneCall className="w-4 h-4 text-[#185FA5]" />
+                <h2 className="font-semibold text-gray-900">Voice Calls ({calls.length})</h2>
+              </div>
+              <div className="space-y-3">
+                {calls.map((call) => {
+                  const isExpanded = expandedCall === call.id;
+                  const duration = call.duration_seconds
+                    ? `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s`
+                    : '—';
+                  return (
+                    <div key={call.id} className="border border-gray-200 rounded-lg p-3">
+                      <button
+                        onClick={() => setExpandedCall(isExpanded ? null : call.id)}
+                        className="w-full flex items-start justify-between text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded-full border ${
+                              call.direction === 'inbound'
+                                ? 'bg-blue-50 text-blue-700 border-blue-100'
+                                : 'bg-violet-50 text-violet-700 border-violet-100'
+                            }`}>
+                              {call.direction === 'inbound' ? '↓ Inbound' : '↑ Outbound'}
+                            </span>
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded-full border ${
+                              call.status === 'ended'
+                                ? 'bg-slate-50 text-slate-600 border-slate-200'
+                                : call.status === 'in_progress'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                  : 'bg-amber-50 text-amber-700 border-amber-100'
+                            }`}>
+                              {call.status}
+                            </span>
+                            {call.sentiment && (
+                              <span className={`text-[11px] px-1.5 py-0.5 rounded-full border ${
+                                call.sentiment === 'Positive'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                  : call.sentiment === 'Negative'
+                                    ? 'bg-red-50 text-red-700 border-red-100'
+                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                              }`}>
+                                {call.sentiment}
+                              </span>
+                            )}
+                            {call.in_voicemail && (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-100">
+                                Voicemail
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-900 mt-1">
+                            {call.direction === 'inbound' ? call.from_number : call.to_number} · {duration}
+                          </p>
+                          {call.summary && (
+                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{call.summary}</p>
+                          )}
+                          <p className="text-[11px] text-gray-400 mt-1">
+                            {call.started_at ? new Date(call.started_at).toLocaleString() : '—'}
+                          </p>
+                        </div>
+                        <span className="text-gray-400 text-sm ml-2">{isExpanded ? '−' : '+'}</span>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-gray-100 space-y-3 text-sm">
+                          {call.recording_url && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Recording</p>
+                              <audio controls src={call.recording_url} className="w-full" />
+                            </div>
+                          )}
+                          {call.transcript && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Transcript</p>
+                              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans bg-gray-50 border border-gray-200 rounded p-3 max-h-64 overflow-y-auto">
+                                {call.transcript}
+                              </pre>
+                            </div>
+                          )}
+                          {call.custom_data && Object.keys(call.custom_data).length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Extracted data</p>
+                              <dl className="text-xs space-y-0.5">
+                                {Object.entries(call.custom_data).map(([k, v]) => (
+                                  <div key={k} className="flex gap-2">
+                                    <dt className="text-gray-500 font-mono">{k}:</dt>
+                                    <dd className="text-gray-800">{String(v)}</dd>
+                                  </div>
+                                ))}
+                              </dl>
+                            </div>
+                          )}
+                          {call.disconnection_reason && (
+                            <p className="text-xs text-gray-500">
+                              Ended: {call.disconnection_reason.replace(/_/g, ' ')}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Timeline */}
           <div className="bg-white border border-gray-200 rounded-xl p-5">
             <h2 className="font-semibold text-gray-900 mb-3">Timeline</h2>
@@ -317,27 +464,31 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
               <p className="text-sm text-gray-400">No events</p>
             ) : (
               <div className="space-y-1">
-                {timeline.map((evt) => (
-                  <button
-                    key={evt.id}
-                    onClick={() => setSelectedEvent(evt)}
-                    className="w-full flex gap-3 text-sm text-left p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-800">{evt.event_type.replace(/_/g, ' ')}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {evt.actor !== 'system' && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{evt.actor}</span>
-                        )}
+                {timeline.map((evt) =>
+                  evt.event_type === 'VOICE_TRANSCRIPT' ? (
+                    <VoiceTranscriptEvent key={evt.id} evt={evt} />
+                  ) : (
+                    <button
+                      key={evt.id}
+                      onClick={() => setSelectedEvent(evt)}
+                      className="w-full flex gap-3 text-sm text-left p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-gray-800">{evt.event_type.replace(/_/g, ' ')}</span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {evt.actor !== 'system' && (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{evt.actor}</span>
+                          )}
+                        </div>
+                        {evt.summary && <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>}
                       </div>
-                      {evt.summary && <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ),
+                )}
               </div>
             )}
           </div>
@@ -374,6 +525,46 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 onClick={() => runAction('trigger-followup')}
                 loading={actionLoading === 'trigger-followup'}
               />
+              {c.customer_phone && (
+                <ActionButton
+                  icon={PhoneCall}
+                  label="Call Customer"
+                  onClick={async () => {
+                    if (!confirm(`Trigger an outbound Retell call to ${c.customer_phone}?`)) return;
+                    setActionLoading('call-customer');
+                    setActionResult(null);
+                    try {
+                      let res = await fetch(`/api/cases/${id}/call-customer`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                      });
+                      if (res.status === 409) {
+                        const data = await res.json().catch(() => null);
+                        if (data?.after_hours && confirm('Outside configured business hours. Call anyway?')) {
+                          res = await fetch(`/api/cases/${id}/call-customer`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ force: true }),
+                          });
+                        } else {
+                          setActionResult('✗ Outside business hours');
+                          return;
+                        }
+                      }
+                      const data = await res.json().catch(() => null);
+                      if (res.ok) {
+                        if (data?.message) setActionResult(`✓ ${data.message}`);
+                        await fetchCase();
+                      } else {
+                        setActionResult(`✗ ${data?.error || 'Call failed'}`);
+                      }
+                    } finally {
+                      setActionLoading('');
+                    }
+                  }}
+                  loading={actionLoading === 'call-customer'}
+                />
+              )}
               <ActionButton
                 icon={X}
                 label="Close Case"
@@ -382,6 +573,11 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 variant="muted"
               />
             </div>
+            {actionResult && (
+              <p className={`text-xs mt-3 ${actionResult.startsWith('✓') ? 'text-emerald-700' : 'text-red-700'}`}>
+                {actionResult}
+              </p>
+            )}
           </div>
 
           {/* Case Meta */}
@@ -442,6 +638,91 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function VoiceTranscriptEvent({ evt }: { evt: TimelineEvent }) {
+  const [open, setOpen] = useState(false);
+  const meta = (evt.metadata || {}) as Record<string, unknown>;
+  const turns = Array.isArray(meta.turns) ? (meta.turns as Array<{ role: string; content: string }>) : [];
+  const direction = meta.direction as string | undefined;
+  const durationSec = meta.duration_seconds as number | null | undefined;
+  const sentiment = meta.sentiment as string | null | undefined;
+  const recordingUrl = meta.recording_url as string | null | undefined;
+
+  const durLabel = durationSec != null
+    ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+    : null;
+
+  return (
+    <div className="flex gap-3 text-sm p-2 rounded-lg">
+      <div className="w-2 h-2 rounded-full bg-violet-400 mt-1.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <button
+          onClick={() => setOpen(!open)}
+          className="w-full text-left hover:bg-gray-50 rounded-md -m-1 p-1 transition-colors"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <PhoneCall className="w-3.5 h-3.5 text-violet-600" />
+            <span className="font-medium text-gray-800">Voice call</span>
+            {direction && (
+              <span className="text-[11px] text-gray-500 capitalize">{direction}</span>
+            )}
+            {durLabel && <span className="text-[11px] text-gray-500">· {durLabel}</span>}
+            {turns.length > 0 && <span className="text-[11px] text-gray-500">· {turns.length} turns</span>}
+            {sentiment && (
+              <span className={`text-[11px] px-1.5 py-0.5 rounded ${
+                sentiment === 'Positive' ? 'bg-emerald-50 text-emerald-700' :
+                sentiment === 'Negative' ? 'bg-red-50 text-red-700' :
+                'bg-slate-50 text-slate-600'
+              }`}>{sentiment}</span>
+            )}
+            <span className="text-xs text-gray-400 ml-auto">
+              {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          {evt.summary && !open && (
+            <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>
+          )}
+        </button>
+
+        {open && (
+          <div className="mt-2 space-y-2">
+            {evt.summary && (
+              <p className="text-xs text-gray-600 italic border-l-2 border-gray-200 pl-2">{evt.summary}</p>
+            )}
+            {recordingUrl && (
+              <audio controls src={recordingUrl} className="w-full h-8" />
+            )}
+            {turns.length === 0 ? (
+              <p className="text-xs text-gray-400">No transcript available</p>
+            ) : (
+              <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+                {turns.map((t, i) => (
+                  <div
+                    key={i}
+                    className={`flex gap-2 text-xs ${t.role === 'agent' ? 'pr-8' : 'pl-8 justify-end'}`}
+                  >
+                    <div
+                      className={`px-2.5 py-1.5 rounded-lg max-w-[85%] ${
+                        t.role === 'agent'
+                          ? 'bg-violet-50 text-violet-900 border border-violet-100'
+                          : 'bg-blue-50 text-blue-900 border border-blue-100'
+                      }`}
+                    >
+                      <div className="text-[10px] font-medium opacity-60 mb-0.5 capitalize">
+                        {t.role === 'agent' ? 'Agent' : 'Customer'}
+                      </div>
+                      <div className="whitespace-pre-wrap">{t.content}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

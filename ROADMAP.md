@@ -4,11 +4,12 @@
 
 ## Status Snapshot (as of 2026-04-15)
 
-- **188 tests passing across 27 test files** (unit + integration)
-- **13 database migrations** applied
+- **200 tests passing across 28 test files** (unit + integration)
+- **14 database migrations** applied
 - **LLM:** Anthropic Claude Sonnet 4
+- **Voice:** Retell AI (inbound calls → auto-create cases)
 - **Deployed:** Railway (web + worker services, Redis plugin)
-- **Phases complete:** 0, 1, 2, 3, 4, 5, 6, 8.1, 8.2, 8.4, 8.5
+- **Phases complete:** 0, 1, 2, 3, 4, 5, 6, 8.1, 8.2, 8.4, 8.5, 10.1 inbound
 
 ---
 
@@ -287,16 +288,21 @@ Core workflow that predates this roadmap:
 > Post-launch expansion: plug ServiceFlow into voice AI and low-code workflow automation to extend the pipeline beyond email.
 
 ### 10.1 Retell AI Voice Agent
-- [ ] Retell AI account setup, API key, `CALL_WEBHOOK_SECRET` env var
-- [ ] DB migration: `calls` table (case_id, retell_call_id, direction, status, started_at, ended_at, duration_seconds, transcript, recording_url)
-- [ ] Inbound call handler — Twilio number forwards to Retell agent that collects caller info (name, problem, address, urgency) and creates a new case via API
-- [ ] Outbound callback — trigger a Retell call for cases where clarification is needed (admin button or automated on low-confidence cases)
-- [ ] Webhook route `/api/webhooks/retell` (signature-verified) for `call_started`, `call_ended`, `call_analyzed`
-- [ ] Link calls to existing cases by phone number lookup, fall back to creating new case
+- [x] Retell SDK installed, settings-backed API key + agent IDs
+- [x] DB migration 014: `calls` table (retell_call_id, case_id, direction, status,
+  transcript, transcript_object, recording_url, sentiment, summary, custom_data)
+- [x] Inbound call handler — `/api/webhooks/retell` signature-verified, rate limited
+- [x] Link calls to existing cases by phone number (last-10-digit matching, open cases)
+- [x] Create case from `call_analyzed` when no match — extracts caller_name, problem,
+  trade, urgency, service_address from agent's custom_analysis_data
+- [x] `call.started`, `call.ended`, `call.analyzed` events emit outbound webhooks
+- [x] Settings → Retell AI Voice Agent section with enable toggle
+- [x] `docs/RETELL_SETUP.md` with full agent configuration guide
+- [ ] Outbound callback — trigger a Retell call from the case detail page
+- [ ] Dashboard: call history panel on case detail showing transcript + recording link
 - [ ] Store transcript as structured case event with speaker-labeled turns
 - [ ] After-hours fallback: configured in Settings, missed calls route to voice agent
-- [ ] Dashboard: call history panel on case detail showing transcript + recording link
-- [ ] Voice agent uses same business info/pricing/booking URLs as email pipeline (shared settings)
+- [ ] Voice agent uses live business config via `retell_llm_dynamic_variables`
 
 ### 10.2 n8n Workflow Integration
 - [x] Generic webhook emission system (Phase 8.5) — DONE, all event types covered
@@ -338,4 +344,4 @@ Core workflow that predates this roadmap:
 | 7 | Scaling & Performance | P2 | Pooling, caching, horizontal scale |
 | 8 | Feature Enhancements | P2 | **8.1 COMPLETE**, **8.2 COMPLETE** (customer portal), 8.3 multi-tenant (deferred), **8.4 COMPLETE** (smart scheduling), **8.5 COMPLETE** (Cal.com + webhooks) |
 | 9 | Documentation & DevEx | P3 | API spec, runbooks, dev tooling |
-| 10 | Voice Agents & Workflow Automation | P2 | 10.1 Retell AI voice (next), 10.2 n8n core done via webhook system, templates + callback API remaining |
+| 10 | Voice Agents & Workflow Automation | P2 | **10.1 inbound COMPLETE** (Retell webhook + case auto-creation), outbound callbacks + dashboard panel remaining; 10.2 n8n core done via webhook system, templates + callback API remaining |

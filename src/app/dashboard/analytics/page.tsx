@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, Clock, AlertTriangle, Users } from 'lucide-react';
+import { TrendingUp, Clock, AlertTriangle, Users, PhoneCall, Voicemail, Smile } from 'lucide-react';
 
 interface Analytics {
   totalCases: number;
@@ -14,6 +14,14 @@ interface Analytics {
   avgResponseMinutes: number | null;
   followupConversionRate: number | null;
   stuckCount: number;
+  voice?: {
+    totalCalls: number;
+    byDirection: Record<string, number>;
+    bySentiment: Record<string, number>;
+    avgDurationSec: number | null;
+    voicemailRate: number | null;
+    successRate: number | null;
+  };
 }
 
 const PIE_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#6b7280', '#14b8a6'];
@@ -172,6 +180,94 @@ export default function AnalyticsPage() {
           </div>
         </div>
       </div>
+
+      {/* Voice Calls Section */}
+      {data.voice && data.voice.totalCalls > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <PhoneCall className="w-5 h-5 text-[#185FA5]" />
+            Voice Calls
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <StatCard icon={PhoneCall} label="Total Calls" value={String(data.voice.totalCalls)} color="blue" />
+            <StatCard
+              icon={Clock}
+              label="Avg Duration"
+              value={data.voice.avgDurationSec !== null
+                ? `${Math.floor(data.voice.avgDurationSec / 60)}m ${data.voice.avgDurationSec % 60}s`
+                : '—'}
+              color="green"
+            />
+            <StatCard
+              icon={Voicemail}
+              label="Voicemail Rate"
+              value={data.voice.voicemailRate !== null ? `${data.voice.voicemailRate}%` : '—'}
+              color="purple"
+            />
+            <StatCard
+              icon={Smile}
+              label="Success Rate"
+              value={data.voice.successRate !== null ? `${data.voice.successRate}%` : '—'}
+              color="green"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="font-semibold text-gray-900 mb-4">Direction</h3>
+              <div className="space-y-2">
+                {Object.entries(data.voice.byDirection).map(([dir, count]) => (
+                  <div key={dir} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600 capitalize">{dir}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${dir === 'inbound' ? 'bg-blue-500' : 'bg-violet-500'}`}
+                          style={{ width: `${data.voice!.totalCalls > 0 ? (count / data.voice!.totalCalls) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <span className="font-medium text-gray-800 w-8 text-right">{count}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <h3 className="font-semibold text-gray-900 mb-4">Sentiment</h3>
+              <div className="space-y-2">
+                {Object.entries(data.voice.bySentiment).length === 0 ? (
+                  <p className="text-sm text-gray-400">No sentiment data yet</p>
+                ) : (
+                  Object.entries(data.voice.bySentiment).map(([sent, count]) => {
+                    const colors: Record<string, string> = {
+                      Positive: 'bg-emerald-500',
+                      Neutral: 'bg-slate-500',
+                      Negative: 'bg-red-500',
+                      Unknown: 'bg-gray-400',
+                    };
+                    return (
+                      <div key={sent} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">{sent}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${colors[sent] || 'bg-gray-400'}`}
+                              style={{ width: `${data.voice!.totalCalls > 0 ? (count / data.voice!.totalCalls) * 100 : 0}%` }}
+                            />
+                          </div>
+                          <span className="font-medium text-gray-800 w-8 text-right">{count}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
