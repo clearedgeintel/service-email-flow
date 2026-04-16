@@ -397,233 +397,52 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
-          {/* Calls */}
-          {calls.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <PhoneCall className="w-4 h-4 text-[#185FA5]" />
-                <h2 className="font-semibold text-gray-900">Voice Calls ({calls.length})</h2>
-              </div>
-              <div className="space-y-3">
-                {calls.map((call) => {
-                  const isExpanded = expandedCall === call.id;
-                  const duration = call.duration_seconds
-                    ? `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s`
-                    : '—';
-                  return (
-                    <div key={call.id} className="border border-gray-200 rounded-lg p-3">
-                      <button
-                        onClick={() => setExpandedCall(isExpanded ? null : call.id)}
-                        className="w-full flex items-start justify-between text-left"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-[11px] px-1.5 py-0.5 rounded-full border ${
-                              call.direction === 'inbound'
-                                ? 'bg-blue-50 text-blue-700 border-blue-100'
-                                : 'bg-violet-50 text-violet-700 border-violet-100'
-                            }`}>
-                              {call.direction === 'inbound' ? '↓ Inbound' : '↑ Outbound'}
-                            </span>
-                            <span className={`text-[11px] px-1.5 py-0.5 rounded-full border ${
-                              call.status === 'ended'
-                                ? 'bg-slate-50 text-slate-600 border-slate-200'
-                                : call.status === 'in_progress'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                  : 'bg-amber-50 text-amber-700 border-amber-100'
-                            }`}>
-                              {call.status}
-                            </span>
-                            {call.sentiment && (
-                              <span className={`text-[11px] px-1.5 py-0.5 rounded-full border ${
-                                call.sentiment === 'Positive'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                  : call.sentiment === 'Negative'
-                                    ? 'bg-red-50 text-red-700 border-red-100'
-                                    : 'bg-slate-50 text-slate-600 border-slate-200'
-                              }`}>
-                                {call.sentiment}
-                              </span>
-                            )}
-                            {call.in_voicemail && (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-100">
-                                Voicemail
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-900 mt-1">
-                            {call.direction === 'inbound' ? call.from_number : call.to_number} · {duration}
-                          </p>
-                          {call.summary && (
-                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{call.summary}</p>
-                          )}
-                          <p className="text-[11px] text-gray-400 mt-1">
-                            {call.started_at ? new Date(call.started_at).toLocaleString() : '—'}
-                          </p>
-                        </div>
-                        <span className="text-gray-400 text-sm ml-2">{isExpanded ? '−' : '+'}</span>
-                      </button>
+          {/* Unified Activity Feed */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 mb-3">Activity</h2>
+            <UnifiedTimeline
+              events={timeline}
+              calls={calls}
+              messages={messages}
+              expandedCall={expandedCall}
+              setExpandedCall={setExpandedCall}
+              onSelectEvent={setSelectedEvent}
+            />
+          </div>
 
-                      {isExpanded && (
-                        <div className="mt-3 pt-3 border-t border-gray-100 space-y-3 text-sm">
-                          {call.recording_url && (
-                            <div>
-                              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Recording</p>
-                              <audio controls src={call.recording_url} className="w-full" />
-                            </div>
-                          )}
-                          {call.transcript && (
-                            <div>
-                              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Transcript</p>
-                              <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans bg-gray-50 border border-gray-200 rounded p-3 max-h-64 overflow-y-auto">
-                                {call.transcript}
-                              </pre>
-                            </div>
-                          )}
-                          {call.custom_data && Object.keys(call.custom_data).length > 0 && (
-                            <div>
-                              <p className="text-xs font-medium text-gray-500 uppercase mb-1">Extracted data</p>
-                              <dl className="text-xs space-y-0.5">
-                                {Object.entries(call.custom_data).map(([k, v]) => (
-                                  <div key={k} className="flex gap-2">
-                                    <dt className="text-gray-500 font-mono">{k}:</dt>
-                                    <dd className="text-gray-800">{String(v)}</dd>
-                                  </div>
-                                ))}
-                              </dl>
-                            </div>
-                          )}
-                          {call.disconnection_reason && (
-                            <p className="text-xs text-gray-500">
-                              Ended: {call.disconnection_reason.replace(/_/g, ' ')}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* SMS Messages */}
-          {(messages.length > 0 || c.customer_phone) && (
+          {/* SMS Composer (separate card — composing new messages is an action, not activity) */}
+          {c.customer_phone && (
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <MessageCircle className="w-4 h-4 text-[#185FA5]" />
-                <h2 className="font-semibold text-gray-900">
-                  SMS {messages.length > 0 ? `(${messages.length})` : ''}
-                </h2>
+                <h2 className="font-semibold text-gray-900">Send SMS</h2>
+                <span className="text-xs text-gray-400">to {c.customer_phone}</span>
               </div>
-
-              {messages.length > 0 && (
-                <div className="space-y-2 mb-3 max-h-96 overflow-y-auto pr-1">
-                  {messages.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[80%] px-3 py-2 rounded-lg border text-sm ${
-                          m.direction === 'outbound'
-                            ? 'bg-blue-50 text-blue-900 border-blue-100'
-                            : 'bg-gray-50 text-gray-900 border-gray-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 text-[10px] opacity-60 mb-0.5 uppercase tracking-wide">
-                          <span>{m.direction === 'outbound' ? 'Sent' : 'Received'}</span>
-                          <span>·</span>
-                          <span>{m.status}</span>
-                          {m.error_code && <span className="text-red-600">· {m.error_code}</span>}
-                        </div>
-                        <p className="whitespace-pre-wrap">{m.body || <em>(no body)</em>}</p>
-                        {m.media_urls && m.media_urls.length > 0 && (
-                          <div className="mt-1.5 flex flex-wrap gap-1">
-                            {m.media_urls.map((url, i) => (
-                              <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[11px] underline opacity-70">
-                                media-{i + 1}
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                        <p className="text-[10px] opacity-50 mt-1">
-                          {new Date(m.sent_at || m.received_at || m.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {c.customer_phone && (
-                <div className="border-t border-gray-100 pt-3">
-                  <label className="text-xs text-gray-500 mb-1 block">
-                    Send SMS to {c.customer_phone}
-                  </label>
-                  <div className="flex gap-2">
-                    <textarea
-                      value={smsBody}
-                      onChange={(e) => setSmsBody(e.target.value)}
-                      placeholder="Type a message..."
-                      maxLength={1600}
-                      rows={2}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 outline-none"
-                      disabled={smsSending}
-                    />
-                    <button
-                      onClick={sendSms}
-                      disabled={smsSending || !smsBody.trim()}
-                      className="px-4 py-2 bg-[#185FA5] text-white rounded-lg text-sm hover:bg-[#0C447C] disabled:opacity-50 flex items-center gap-1.5 self-stretch"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      {smsSending ? 'Sending' : 'Send'}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-[11px] text-gray-400">{smsBody.length}/1600</span>
-                    {smsError && <span className="text-[11px] text-red-600">{smsError}</span>}
-                  </div>
-                </div>
-              )}
+              <div className="flex gap-2">
+                <textarea
+                  value={smsBody}
+                  onChange={(e) => setSmsBody(e.target.value)}
+                  placeholder="Type a message..."
+                  maxLength={1600}
+                  rows={2}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 outline-none"
+                  disabled={smsSending}
+                />
+                <button
+                  onClick={sendSms}
+                  disabled={smsSending || !smsBody.trim()}
+                  className="px-4 py-2 bg-[#185FA5] text-white rounded-lg text-sm hover:bg-[#0C447C] disabled:opacity-50 flex items-center gap-1.5 self-stretch"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {smsSending ? 'Sending' : 'Send'}
+                </button>
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-[11px] text-gray-400">{smsBody.length}/1600</span>
+                {smsError && <span className="text-[11px] text-red-600">{smsError}</span>}
+              </div>
             </div>
           )}
-
-          {/* Timeline */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Timeline</h2>
-            {timeline.length === 0 ? (
-              <p className="text-sm text-gray-400">No events</p>
-            ) : (
-              <div className="space-y-1">
-                {timeline.map((evt) =>
-                  evt.event_type === 'VOICE_TRANSCRIPT' ? (
-                    <VoiceTranscriptEvent key={evt.id} evt={evt} />
-                  ) : (
-                    <button
-                      key={evt.id}
-                      onClick={() => setSelectedEvent(evt)}
-                      className="w-full flex gap-3 text-sm text-left p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-gray-800">{evt.event_type.replace(/_/g, ' ')}</span>
-                          <span className="text-xs text-gray-400">
-                            {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {evt.actor !== 'system' && (
-                            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{evt.actor}</span>
-                          )}
-                        </div>
-                        {evt.summary && <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>}
-                      </div>
-                    </button>
-                  ),
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Sidebar — Actions + Meta */}
@@ -774,62 +593,150 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   );
 }
 
-function VoiceTranscriptEvent({ evt }: { evt: TimelineEvent }) {
-  const [open, setOpen] = useState(false);
-  const meta = (evt.metadata || {}) as Record<string, unknown>;
-  const turns = Array.isArray(meta.turns) ? (meta.turns as Array<{ role: string; content: string }>) : [];
-  const direction = meta.direction as string | undefined;
-  const durationSec = meta.duration_seconds as number | null | undefined;
-  const sentiment = meta.sentiment as string | null | undefined;
-  const recordingUrl = meta.recording_url as string | null | undefined;
+// --- Unified Timeline -----------------------------------------------------
 
-  const durLabel = durationSec != null
-    ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+type FeedItem =
+  | { kind: 'event'; at: number; data: TimelineEvent }
+  | { kind: 'call'; at: number; data: CallRecord }
+  | { kind: 'sms'; at: number; data: SmsMessage };
+
+/**
+ * Hide channel-derived events (their content lives in the calls/sms rows).
+ * We keep workflow events (CLASSIFIED, REPLY_SENT, ESCALATED, CLOSED, etc.).
+ */
+function isChannelDerivedEvent(evt: TimelineEvent): boolean {
+  if (evt.event_type === 'VOICE_TRANSCRIPT') return true;
+  if (evt.actor === 'retell' || evt.actor === 'sms') return true;
+  const meta = (evt.metadata || {}) as Record<string, unknown>;
+  if (meta.retell_call_id || meta.twilio_sid) return true;
+  return false;
+}
+
+function UnifiedTimeline({
+  events, calls, messages, expandedCall, setExpandedCall, onSelectEvent,
+}: {
+  events: TimelineEvent[];
+  calls: CallRecord[];
+  messages: SmsMessage[];
+  expandedCall: number | null;
+  setExpandedCall: (id: number | null) => void;
+  onSelectEvent: (e: TimelineEvent) => void;
+}) {
+  const items: FeedItem[] = [
+    ...events.filter((e) => !isChannelDerivedEvent(e)).map((e) => ({
+      kind: 'event' as const, at: new Date(e.created_at).getTime(), data: e,
+    })),
+    ...calls.map((c) => ({
+      kind: 'call' as const,
+      at: new Date(c.started_at || c.ended_at || Date.now()).getTime(),
+      data: c,
+    })),
+    ...messages.map((m) => ({
+      kind: 'sms' as const,
+      at: new Date(m.received_at || m.sent_at || m.created_at).getTime(),
+      data: m,
+    })),
+  ].sort((a, b) => a.at - b.at);
+
+  if (items.length === 0) {
+    return <p className="text-sm text-gray-400">No activity yet</p>;
+  }
+
+  return (
+    <div className="space-y-1">
+      {items.map((item) => {
+        if (item.kind === 'event') {
+          return <EventRow key={`e${item.data.id}`} evt={item.data} onClick={() => onSelectEvent(item.data)} />;
+        }
+        if (item.kind === 'call') {
+          return (
+            <CallRow
+              key={`c${item.data.id}`}
+              call={item.data}
+              expanded={expandedCall === item.data.id}
+              onToggle={() => setExpandedCall(expandedCall === item.data.id ? null : item.data.id)}
+            />
+          );
+        }
+        return <SmsRow key={`s${item.data.id}`} msg={item.data} />;
+      })}
+    </div>
+  );
+}
+
+function EventRow({ evt, onClick }: { evt: TimelineEvent; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex gap-3 text-sm text-left p-2 rounded-lg hover:bg-gray-50 transition-colors"
+    >
+      <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-gray-800">{evt.event_type.replace(/_/g, ' ')}</span>
+          <span className="text-xs text-gray-400">
+            {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </span>
+          {evt.actor !== 'system' && (
+            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{evt.actor}</span>
+          )}
+        </div>
+        {evt.summary && <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>}
+      </div>
+    </button>
+  );
+}
+
+function CallRow({ call, expanded, onToggle }: {
+  call: CallRecord; expanded: boolean; onToggle: () => void;
+}) {
+  const duration = call.duration_seconds != null
+    ? `${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s`
     : null;
+  const otherParty = call.direction === 'inbound' ? call.from_number : call.to_number;
+  const turns = extractTurnsFromCall(call);
 
   return (
     <div className="flex gap-3 text-sm p-2 rounded-lg">
       <div className="w-2 h-2 rounded-full bg-violet-400 mt-1.5 shrink-0" />
       <div className="flex-1 min-w-0">
-        <button
-          onClick={() => setOpen(!open)}
-          className="w-full text-left hover:bg-gray-50 rounded-md -m-1 p-1 transition-colors"
-        >
+        <button onClick={onToggle} className="w-full text-left hover:bg-gray-50 rounded-md -m-1 p-1 transition-colors">
           <div className="flex items-center gap-2 flex-wrap">
             <PhoneCall className="w-3.5 h-3.5 text-violet-600" />
             <span className="font-medium text-gray-800">Voice call</span>
-            {direction && (
-              <span className="text-[11px] text-gray-500 capitalize">{direction}</span>
-            )}
-            {durLabel && <span className="text-[11px] text-gray-500">· {durLabel}</span>}
-            {turns.length > 0 && <span className="text-[11px] text-gray-500">· {turns.length} turns</span>}
-            {sentiment && (
+            <span className="text-[11px] text-gray-500 capitalize">{call.direction}</span>
+            {duration && <span className="text-[11px] text-gray-500">· {duration}</span>}
+            {otherParty && <span className="text-[11px] text-gray-500">· {otherParty}</span>}
+            {call.sentiment && (
               <span className={`text-[11px] px-1.5 py-0.5 rounded ${
-                sentiment === 'Positive' ? 'bg-emerald-50 text-emerald-700' :
-                sentiment === 'Negative' ? 'bg-red-50 text-red-700' :
+                call.sentiment === 'Positive' ? 'bg-emerald-50 text-emerald-700' :
+                call.sentiment === 'Negative' ? 'bg-red-50 text-red-700' :
                 'bg-slate-50 text-slate-600'
-              }`}>{sentiment}</span>
+              }`}>{call.sentiment}</span>
+            )}
+            {call.in_voicemail && (
+              <span className="text-[11px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">Voicemail</span>
             )}
             <span className="text-xs text-gray-400 ml-auto">
-              {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {call.started_at
+                ? new Date(call.started_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : '—'}
             </span>
           </div>
-          {evt.summary && !open && (
-            <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>
+          {call.summary && !expanded && (
+            <p className="text-gray-600 mt-0.5 truncate">{call.summary}</p>
           )}
         </button>
 
-        {open && (
+        {expanded && (
           <div className="mt-2 space-y-2">
-            {evt.summary && (
-              <p className="text-xs text-gray-600 italic border-l-2 border-gray-200 pl-2">{evt.summary}</p>
+            {call.summary && (
+              <p className="text-xs text-gray-600 italic border-l-2 border-gray-200 pl-2">{call.summary}</p>
             )}
-            {recordingUrl && (
-              <audio controls src={recordingUrl} className="w-full h-8" />
+            {call.recording_url && (
+              <audio controls src={call.recording_url} className="w-full h-8" />
             )}
-            {turns.length === 0 ? (
-              <p className="text-xs text-gray-400">No transcript available</p>
-            ) : (
+            {turns.length > 0 ? (
               <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
                 {turns.map((t, i) => (
                   <div
@@ -851,9 +758,86 @@ function VoiceTranscriptEvent({ evt }: { evt: TimelineEvent }) {
                   </div>
                 ))}
               </div>
+            ) : call.transcript ? (
+              <pre className="text-[11px] text-gray-700 whitespace-pre-wrap font-sans bg-gray-50 border border-gray-200 rounded p-2 max-h-64 overflow-y-auto">
+                {call.transcript}
+              </pre>
+            ) : (
+              <p className="text-xs text-gray-400">No transcript available</p>
+            )}
+            {call.custom_data && Object.keys(call.custom_data).length > 0 && (
+              <dl className="text-[11px] space-y-0.5">
+                {Object.entries(call.custom_data).map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <dt className="text-gray-500 font-mono">{k}:</dt>
+                    <dd className="text-gray-800">{String(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {call.disconnection_reason && (
+              <p className="text-[11px] text-gray-500">
+                Ended: {call.disconnection_reason.replace(/_/g, ' ')}
+              </p>
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function extractTurnsFromCall(call: CallRecord): Array<{ role: string; content: string }> {
+  const raw = (call as unknown as { transcript_object?: unknown }).transcript_object;
+  if (!Array.isArray(raw)) return [];
+  const turns: Array<{ role: string; content: string }> = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const rec = item as Record<string, unknown>;
+    const role = rec.role === 'user' ? 'user' : rec.role === 'agent' ? 'agent' : null;
+    const content = typeof rec.content === 'string' ? rec.content.trim() : '';
+    if (role && content) turns.push({ role, content });
+  }
+  return turns;
+}
+
+function SmsRow({ msg }: { msg: SmsMessage }) {
+  const ts = msg.sent_at || msg.received_at || msg.created_at;
+  const isOutbound = msg.direction === 'outbound';
+  return (
+    <div className="flex gap-3 text-sm p-2 rounded-lg">
+      <div className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+          <span className="font-medium text-gray-800">SMS</span>
+          <span className="text-[11px] text-gray-500 capitalize">{msg.direction}</span>
+          <span className="text-[11px] text-gray-500">· {msg.status}</span>
+          {msg.error_code && <span className="text-[11px] text-red-600">· {msg.error_code}</span>}
+          <span className="text-xs text-gray-400 ml-auto">
+            {new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+        <div className={`flex ${isOutbound ? 'justify-end' : 'justify-start'}`}>
+          <div
+            className={`max-w-[80%] px-3 py-2 rounded-lg border text-sm ${
+              isOutbound
+                ? 'bg-blue-50 text-blue-900 border-blue-100'
+                : 'bg-gray-50 text-gray-900 border-gray-200'
+            }`}
+          >
+            <p className="whitespace-pre-wrap">{msg.body || <em>(no body)</em>}</p>
+            {msg.media_urls && msg.media_urls.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {msg.media_urls.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer" className="text-[11px] underline opacity-70">
+                    media-{i + 1}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
