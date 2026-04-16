@@ -1,14 +1,14 @@
 # ServiceFlow — Development Roadmap
 
-> Current state: production-ready single-tenant MVP with full intake-classify-route-reply-notify-follow-up pipeline, admin dashboard, Cal.com booking integration, Gmail label sync, draft approval workflow, and Railway deployment config.
+> ClearDesk by ClearEdge Intelligence — AI email automation for service businesses. Production-ready single-tenant platform with full email pipeline, admin dashboard, customer portal, Cal.com smart scheduling, outbound webhook system, and Railway deployment.
 
-## Status Snapshot (as of 2026-04)
+## Status Snapshot (as of 2026-04-15)
 
-- **166 tests passing across 25 test files** (unit + integration)
-- **8 database migrations** applied
-- **LLM:** Anthropic Claude Sonnet 4 (migrated from OpenAI)
-- **Deployed:** Railway (Dockerfile + railway.toml)
-- **Phases complete:** 1, 2, 3, 4, 5, 6, 8.1, 8.4, plus Cal.com from 8.5
+- **188 tests passing across 27 test files** (unit + integration)
+- **13 database migrations** applied
+- **LLM:** Anthropic Claude Sonnet 4
+- **Deployed:** Railway (web + worker services, Redis plugin)
+- **Phases complete:** 0, 1, 2, 3, 4, 5, 6, 8.1, 8.2, 8.4, 8.5
 
 ---
 
@@ -299,11 +299,9 @@ Core workflow that predates this roadmap:
 - [ ] Voice agent uses same business info/pricing/booking URLs as email pipeline (shared settings)
 
 ### 10.2 n8n Workflow Integration
-- [ ] Generic webhook emission system in ServiceFlow (subscribable per event type)
-- [ ] Case event webhooks: `case.created`, `case.classified`, `case.escalated`, `case.replied`, `case.booked`, `case.closed`
-- [ ] Webhook config table: URL, secret, enabled event types, retry policy
-- [ ] HMAC-SHA256 signature on outgoing webhooks so n8n can verify
-- [ ] Settings page: "Integrations" tab to add/test/disable webhook subscriptions
+- [x] Generic webhook emission system (Phase 8.5) — DONE, all event types covered
+- [x] Webhook config via Settings → Webhooks tab — DONE
+- [x] HMAC-SHA256 signing on outgoing webhooks — DONE
 - [ ] Pre-built n8n workflow templates in `docs/n8n-templates/`:
   - New case → Slack notification + HubSpot contact sync
   - Booking confirmed → Google Calendar event + SMS confirmation to tech
@@ -338,6 +336,6 @@ Core workflow that predates this roadmap:
 | 5 | Email & Communication | P1 | **COMPLETE** — shared email builder, List-Unsubscribe, plain-text fallback |
 | 6 | Data & Privacy | P2 | **COMPLETE** — GDPR export/forget, retention, session cleanup |
 | 7 | Scaling & Performance | P2 | Pooling, caching, horizontal scale |
-| 8 | Feature Enhancements | P2 | 8.1 dashboard COMPLETE, 8.4 smart features COMPLETE, Cal.com integration from 8.5 COMPLETE; remaining: customer portal, multi-tenant, integrations |
+| 8 | Feature Enhancements | P2 | **8.1 COMPLETE**, **8.2 COMPLETE** (customer portal), 8.3 multi-tenant (deferred), **8.4 COMPLETE** (smart scheduling), **8.5 COMPLETE** (Cal.com + webhooks) |
 | 9 | Documentation & DevEx | P3 | API spec, runbooks, dev tooling |
-| 10 | Voice Agents & Workflow Automation | P2 | **NEW** — Retell AI inbound/outbound calls, n8n workflow integration, emergency escalation chains |
+| 10 | Voice Agents & Workflow Automation | P2 | 10.1 Retell AI voice (next), 10.2 n8n core done via webhook system, templates + callback API remaining |
