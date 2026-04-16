@@ -284,16 +284,28 @@ export async function processRetellWebhook(payload: RetellWebhookPayload): Promi
     await upsertCall(call, caseId, analysisUpdates);
 
     if (caseId) {
+      const turns = extractTranscriptTurns(call.transcript_object, call.transcript);
+      const durationSec = call.start_timestamp && call.end_timestamp
+        ? Math.round((call.end_timestamp - call.start_timestamp) / 1000)
+        : null;
+
       await logCaseEvent({
         caseId,
-        eventType: EventType.NOTE_ADDED,
+        eventType: EventType.VOICE_TRANSCRIPT,
         actor: 'retell',
-        summary: `Voice call analyzed: ${analysis?.call_summary || 'no summary'}`,
+        summary: analysis?.call_summary
+          || (turns.length ? `Voice call — ${turns.length} turns` : 'Voice call'),
         metadata: {
           retell_call_id: call.call_id,
+          direction,
+          from_number: call.from_number,
+          to_number: call.to_number,
+          duration_seconds: durationSec,
           sentiment: analysis?.user_sentiment,
           call_successful: analysis?.call_successful,
           in_voicemail: analysis?.in_voicemail,
+          recording_url: call.recording_url || null,
+          turns,
         },
       });
     }
@@ -306,6 +318,48 @@ export async function processRetellWebhook(payload: RetellWebhookPayload): Promi
   }
 
   return { handled: false, caseId: null, callId: call.call_id, action: 'ignored' };
+}
+
+interface TranscriptTurn {
+  role: 'agent' | 'user';
+  content: string;
+}
+
+/**
+ * Normalize Retell's transcript_object (or raw transcript string) into a
+ * compact [{role, content}] array suitable for rendering in the case timeline.
+ * Drops word-level timing to keep the event row small.
+ */
+export function extractTranscriptTurns(
+  transcriptObject: unknown,
+  transcript: string | null | undefined,
+): TranscriptTurn[] {
+  if (Array.isArray(transcriptObject)) {
+    const turns: TranscriptTurn[] = [];
+    for (const item of transcriptObject) {
+      if (!item || typeof item !== 'object') continue;
+      const rec = item as Record<string, unknown>;
+      const role = rec.role === 'user' ? 'user' : rec.role === 'agent' ? 'agent' : null;
+      const content = typeof rec.content === 'string' ? rec.content.trim() : '';
+      if (role && content) turns.push({ role, content });
+    }
+    if (turns.length) return turns;
+  }
+
+  // Fallback: parse "Agent: ...\nUser: ..." style string transcript
+  if (typeof transcript === 'string' && transcript.trim()) {
+    const turns: TranscriptTurn[] = [];
+    for (const line of transcript.split(/\r?\n/)) {
+      const match = line.match(/^\s*(Agent|User|Customer|Assistant)\s*:\s*(.+)$/i);
+      if (!match) continue;
+      const speaker = match[1].toLowerCase();
+      const role: 'agent' | 'user' = speaker === 'user' || speaker === 'customer' ? 'user' : 'agent';
+      turns.push({ role, content: match[2].trim() });
+    }
+    return turns;
+  }
+
+  return [];
 }
 
 /** Load the Retell API key from settings (or env as fallback) */

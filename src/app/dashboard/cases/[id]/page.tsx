@@ -464,27 +464,31 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
               <p className="text-sm text-gray-400">No events</p>
             ) : (
               <div className="space-y-1">
-                {timeline.map((evt) => (
-                  <button
-                    key={evt.id}
-                    onClick={() => setSelectedEvent(evt)}
-                    className="w-full flex gap-3 text-sm text-left p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-800">{evt.event_type.replace(/_/g, ' ')}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {evt.actor !== 'system' && (
-                          <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{evt.actor}</span>
-                        )}
+                {timeline.map((evt) =>
+                  evt.event_type === 'VOICE_TRANSCRIPT' ? (
+                    <VoiceTranscriptEvent key={evt.id} evt={evt} />
+                  ) : (
+                    <button
+                      key={evt.id}
+                      onClick={() => setSelectedEvent(evt)}
+                      className="w-full flex gap-3 text-sm text-left p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-gray-800">{evt.event_type.replace(/_/g, ' ')}</span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {evt.actor !== 'system' && (
+                            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{evt.actor}</span>
+                          )}
+                        </div>
+                        {evt.summary && <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>}
                       </div>
-                      {evt.summary && <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ),
+                )}
               </div>
             )}
           </div>
@@ -606,6 +610,91 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function VoiceTranscriptEvent({ evt }: { evt: TimelineEvent }) {
+  const [open, setOpen] = useState(false);
+  const meta = (evt.metadata || {}) as Record<string, unknown>;
+  const turns = Array.isArray(meta.turns) ? (meta.turns as Array<{ role: string; content: string }>) : [];
+  const direction = meta.direction as string | undefined;
+  const durationSec = meta.duration_seconds as number | null | undefined;
+  const sentiment = meta.sentiment as string | null | undefined;
+  const recordingUrl = meta.recording_url as string | null | undefined;
+
+  const durLabel = durationSec != null
+    ? `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`
+    : null;
+
+  return (
+    <div className="flex gap-3 text-sm p-2 rounded-lg">
+      <div className="w-2 h-2 rounded-full bg-violet-400 mt-1.5 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <button
+          onClick={() => setOpen(!open)}
+          className="w-full text-left hover:bg-gray-50 rounded-md -m-1 p-1 transition-colors"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <PhoneCall className="w-3.5 h-3.5 text-violet-600" />
+            <span className="font-medium text-gray-800">Voice call</span>
+            {direction && (
+              <span className="text-[11px] text-gray-500 capitalize">{direction}</span>
+            )}
+            {durLabel && <span className="text-[11px] text-gray-500">· {durLabel}</span>}
+            {turns.length > 0 && <span className="text-[11px] text-gray-500">· {turns.length} turns</span>}
+            {sentiment && (
+              <span className={`text-[11px] px-1.5 py-0.5 rounded ${
+                sentiment === 'Positive' ? 'bg-emerald-50 text-emerald-700' :
+                sentiment === 'Negative' ? 'bg-red-50 text-red-700' :
+                'bg-slate-50 text-slate-600'
+              }`}>{sentiment}</span>
+            )}
+            <span className="text-xs text-gray-400 ml-auto">
+              {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          {evt.summary && !open && (
+            <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>
+          )}
+        </button>
+
+        {open && (
+          <div className="mt-2 space-y-2">
+            {evt.summary && (
+              <p className="text-xs text-gray-600 italic border-l-2 border-gray-200 pl-2">{evt.summary}</p>
+            )}
+            {recordingUrl && (
+              <audio controls src={recordingUrl} className="w-full h-8" />
+            )}
+            {turns.length === 0 ? (
+              <p className="text-xs text-gray-400">No transcript available</p>
+            ) : (
+              <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+                {turns.map((t, i) => (
+                  <div
+                    key={i}
+                    className={`flex gap-2 text-xs ${t.role === 'agent' ? 'pr-8' : 'pl-8 justify-end'}`}
+                  >
+                    <div
+                      className={`px-2.5 py-1.5 rounded-lg max-w-[85%] ${
+                        t.role === 'agent'
+                          ? 'bg-violet-50 text-violet-900 border border-violet-100'
+                          : 'bg-blue-50 text-blue-900 border border-blue-100'
+                      }`}
+                    >
+                      <div className="text-[10px] font-medium opacity-60 mb-0.5 capitalize">
+                        {t.role === 'agent' ? 'Agent' : 'Customer'}
+                      </div>
+                      <div className="whitespace-pre-wrap">{t.content}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

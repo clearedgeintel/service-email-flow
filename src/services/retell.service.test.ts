@@ -38,6 +38,7 @@ import {
   verifyRetellSignature,
   processRetellWebhook,
   isRetellEnabled,
+  extractTranscriptTurns,
 } from './retell.service';
 import { getSupabase } from '@/lib/supabase';
 import { getConfig } from '@/lib/config';
@@ -90,6 +91,40 @@ describe('isRetellEnabled', () => {
   it('returns false when setting is string "false"', async () => {
     mockedGetConfig.mockResolvedValue('false');
     expect(await isRetellEnabled()).toBe(false);
+  });
+});
+
+describe('extractTranscriptTurns', () => {
+  it('normalizes Retell transcript_object, stripping word-level timing', () => {
+    const result = extractTranscriptTurns(
+      [
+        { role: 'agent', content: '  Hi  ', words: [{ word: 'Hi' }] },
+        { role: 'user', content: 'Hello back' },
+        { role: 'other', content: 'ignored' },
+      ],
+      null,
+    );
+    expect(result).toEqual([
+      { role: 'agent', content: 'Hi' },
+      { role: 'user', content: 'Hello back' },
+    ]);
+  });
+
+  it('falls back to parsing "Agent:/User:" lines from raw transcript', () => {
+    const result = extractTranscriptTurns(
+      null,
+      'Agent: Hello\nCustomer: Hi there\nAgent: How can I help?',
+    );
+    expect(result).toEqual([
+      { role: 'agent', content: 'Hello' },
+      { role: 'user', content: 'Hi there' },
+      { role: 'agent', content: 'How can I help?' },
+    ]);
+  });
+
+  it('returns empty array when no transcript data present', () => {
+    expect(extractTranscriptTurns(null, null)).toEqual([]);
+    expect(extractTranscriptTurns([], '')).toEqual([]);
   });
 });
 
@@ -218,6 +253,61 @@ describe('processRetellWebhook', () => {
     expect(result.handled).toBe(true);
     expect(result.action).toBe('analyzed');
     expect(result.caseId).toBe(77);
+  });
+
+  it('logs VOICE_TRANSCRIPT case event with structured turns on call_analyzed', async () => {
+    const { logCaseEvent } = await import('./case-event.service');
+    const mockSb = createMockSupabase();
+
+    // existing call row already linked
+    mockSb.from.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: { case_id: 42 } }),
+        }),
+      }),
+    });
+    // upsert call row
+    mockSb.from.mockReturnValueOnce({
+      upsert: vi.fn().mockResolvedValue({ error: null }),
+    });
+    mockedGetSupabase.mockReturnValue(mockSb as any);
+
+    await processRetellWebhook(
+      buildPayload('call_analyzed', {
+        transcript_object: [
+          { role: 'agent', content: 'Hello, how can I help?', words: [{ w: 'Hello' }] },
+          { role: 'user', content: 'My AC is broken.' },
+          { role: 'agent', content: 'Got it, let me get a tech out.' },
+        ],
+        recording_url: 'https://retell.example/rec.mp3',
+        call_analysis: {
+          call_summary: 'Customer AC broken',
+          user_sentiment: 'Neutral',
+          call_successful: true,
+          in_voicemail: false,
+        },
+      }),
+    );
+
+    expect(logCaseEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: 42,
+        eventType: 'VOICE_TRANSCRIPT',
+        actor: 'retell',
+        metadata: expect.objectContaining({
+          retell_call_id: 'call_test_123',
+          direction: 'inbound',
+          recording_url: 'https://retell.example/rec.mp3',
+          sentiment: 'Neutral',
+          turns: [
+            { role: 'agent', content: 'Hello, how can I help?' },
+            { role: 'user', content: 'My AC is broken.' },
+            { role: 'agent', content: 'Got it, let me get a tech out.' },
+          ],
+        }),
+      }),
+    );
   });
 
   it('emits case.ended webhook event on call_ended', async () => {
