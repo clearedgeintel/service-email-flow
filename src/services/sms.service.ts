@@ -207,6 +207,24 @@ export async function processInboundSms(params: TwilioInboundParams): Promise<{
     media_urls: mediaUrls,
   });
 
+  // Fire-and-forget auto-reply enqueue. Worker re-checks the flag before
+  // spending a Claude call, so flipping the toggle off mid-flight is safe.
+  if (caseId && body) {
+    try {
+      const { isSmsAutoReplyEnabled } = await import('./sms-reply.service');
+      if (await isSmsAutoReplyEnabled()) {
+        const { getQueue, QUEUE_NAMES } = await import('@/lib/queue');
+        await getQueue(QUEUE_NAMES.SMS_AUTO_REPLY).add('reply', {
+          caseId,
+          inboundBody: body,
+        });
+      }
+    } catch (err) {
+      // Queue may be unavailable in test/dev — don't break the webhook
+      log.warn({ err, caseId }, 'Failed to enqueue SMS auto-reply');
+    }
+  }
+
   log.info({ sid, caseId, messageId }, 'Inbound SMS processed');
   return { handled: true, caseId, messageId };
 }

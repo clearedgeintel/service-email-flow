@@ -13,6 +13,7 @@ export const QUEUE_NAMES = {
   DIGEST: 'digest',
   ERROR_ALERT: 'error-alert',
   WEBHOOK_DISPATCH: 'webhook-dispatch',
+  SMS_AUTO_REPLY: 'sms-auto-reply',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

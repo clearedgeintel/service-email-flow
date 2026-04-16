@@ -79,6 +79,7 @@ const SETTING_GROUPS = [
       { key: 'twilio_account_sid', label: 'Account SID', type: 'text' },
       { key: 'twilio_auth_token', label: 'Auth Token', type: 'password' },
       { key: 'twilio_from_number', label: 'From Number', type: 'text' },
+      { key: 'sms_auto_reply_throttle_minutes', label: 'Auto-reply throttle (minutes)', type: 'number' },
     ],
   },
   {
@@ -725,6 +726,24 @@ export default function SettingsPage() {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.twilio_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.twilio_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+              <div>
+                <p className="text-sm font-medium text-gray-900">SMS auto-reply</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {settings.sms_auto_reply_enabled === 'true'
+                    ? 'Inbound SMS triggers a Claude-generated reply. Throttle (below) prevents runaway loops if a customer rapid-fires texts.'
+                    : 'Disabled — inbound SMS is recorded but never auto-replied. Enable to have Claude draft and send an SMS response.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, sms_auto_reply_enabled: settings.sms_auto_reply_enabled === 'true' ? 'false' : 'true' })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.sms_auto_reply_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.sms_auto_reply_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
 
