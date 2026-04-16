@@ -13,6 +13,9 @@ export const WEBHOOK_EVENT_TYPES = [
   'case.booked',
   'case.closed',
   'case.note_added',
+  'call.started',
+  'call.ended',
+  'call.analyzed',
 ] as const;
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
