@@ -4,10 +4,11 @@ import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StatusBadge, UrgencyBadge, IntentBadge } from '@/components/status-badge';
-import { Search, RefreshCw, ChevronLeft, ChevronRight, Filter, Download, Bookmark, X as CloseIcon, AlertTriangle, X as XIcon, Activity, Mail } from 'lucide-react';
+import { Search, RefreshCw, ChevronLeft, ChevronRight, Filter, Download, Bookmark, X as CloseIcon, AlertTriangle, X as XIcon, Activity, Mail, PhoneCall, MessageCircle } from 'lucide-react';
 
 interface CaseRow {
   id: number;
+  gmail_message_id: string;
   from_email: string;
   customer_name: string | null;
   subject: string | null;
@@ -18,6 +19,12 @@ interface CaseRow {
   received_at: string;
   customer_reply_sent: boolean;
   tech_notified: boolean;
+}
+
+function ChannelIcon({ gmailId }: { gmailId: string }) {
+  if (gmailId.startsWith('retell:')) return <PhoneCall className="w-3.5 h-3.5 text-violet-500" aria-label="Voice" />;
+  if (gmailId.startsWith('sms:')) return <MessageCircle className="w-3.5 h-3.5 text-emerald-500" aria-label="SMS" />;
+  return <Mail className="w-3.5 h-3.5 text-blue-500" aria-label="Email" />;
 }
 
 interface SavedFilter {
@@ -76,6 +83,7 @@ function CaseQueueContent() {
   const intent = searchParams.get('intent') || '';
   const urgency = searchParams.get('urgency') || '';
   const search = searchParams.get('search') || '';
+  const channel = searchParams.get('channel') || '';
 
   // Load saved filters from localStorage
   useEffect(() => {
@@ -96,6 +104,7 @@ function CaseQueueContent() {
     if (intent) params.set('intent', intent);
     if (urgency) params.set('urgency', urgency);
     if (search) params.set('search', search);
+    if (channel) params.set('channel', channel);
 
     try {
       const res = await fetch(`/api/cases?${params}`);
@@ -121,7 +130,7 @@ function CaseQueueContent() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, status, intent, urgency, search, router]);
+  }, [page, status, intent, urgency, search, channel, router]);
 
   useEffect(() => {
     fetchCases();
@@ -191,6 +200,7 @@ function CaseQueueContent() {
     if (intent) params.set('intent', intent);
     if (urgency) params.set('urgency', urgency);
     if (search) params.set('search', search);
+    if (channel) params.set('channel', channel);
     window.location.href = `/api/cases/export?${params}`;
   };
 
@@ -249,6 +259,7 @@ function CaseQueueContent() {
     if (intent) current.intent = intent;
     if (urgency) current.urgency = urgency;
     if (search) current.search = search;
+    if (channel) current.channel = channel;
 
     const updated = [...savedFilters, { name: newFilterName.trim(), params: current }];
     setSavedFilters(updated);
@@ -426,7 +437,7 @@ function CaseQueueContent() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
           <input
             type="text"
-            placeholder="Search by name, email, subject..."
+            placeholder="Search across emails, call transcripts, SMS..."
             defaultValue={search}
             onKeyDown={(e) => {
               if (e.key === 'Enter') updateFilter('search', (e.target as HTMLInputElement).value);
@@ -437,6 +448,34 @@ function CaseQueueContent() {
 
         {showFilters && (
           <div className="p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3">
+            {/* Channel filter chips */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">Channel:</span>
+              {([
+                { value: '', label: 'All', icon: null },
+                { value: 'email', label: 'Email', icon: Mail },
+                { value: 'voice', label: 'Voice', icon: PhoneCall },
+                { value: 'sms', label: 'SMS', icon: MessageCircle },
+              ] as const).map((ch) => {
+                const isActive = channel === ch.value;
+                const Icon = ch.icon;
+                return (
+                  <button
+                    key={ch.value}
+                    onClick={() => updateFilter('channel', ch.value)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                      isActive
+                        ? 'bg-[#185FA5] text-white border-[#185FA5]'
+                        : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {Icon && <Icon className="w-3 h-3" />}
+                    {ch.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <select
                 value={status}
@@ -599,7 +638,12 @@ function CaseQueueContent() {
                         className="rounded"
                       />
                     </td>
-                    <td className="px-4 py-3 font-mono text-gray-500 dark:text-gray-400 cursor-pointer" onClick={() => router.push(`/dashboard/cases/${c.id}`)}>#{c.id}</td>
+                    <td className="px-4 py-3 cursor-pointer" onClick={() => router.push(`/dashboard/cases/${c.id}`)}>
+                      <div className="flex items-center gap-1.5">
+                        <ChannelIcon gmailId={c.gmail_message_id} />
+                        <span className="font-mono text-gray-500 dark:text-gray-400">#{c.id}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 cursor-pointer" onClick={() => router.push(`/dashboard/cases/${c.id}`)}>
                       <div className="font-medium text-gray-900 dark:text-gray-100">{c.customer_name || '—'}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{c.from_email}</div>
@@ -657,7 +701,10 @@ function CaseQueueContent() {
                     <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{c.customer_name || c.from_email}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{c.subject || '(no subject)'}</p>
                   </div>
-                  <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">#{c.id}</span>
+                  <span className="flex items-center gap-1 text-xs text-gray-400 ml-2 whitespace-nowrap">
+                    <ChannelIcon gmailId={c.gmail_message_id} />
+                    #{c.id}
+                  </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
                   <StatusBadge status={c.status} />
