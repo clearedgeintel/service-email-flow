@@ -91,6 +91,143 @@ export function invalidateTemplateCache(key?: string): void {
 }
 
 /**
+ * Defaults that mirror the migration 010 seed. Used to re-seed if the
+ * email_templates table is empty (the migration ran but rows were lost,
+ * or the migration was skipped in a fresh environment).
+ *
+ * Keep in sync with supabase/migrations/010_email_templates.sql.
+ */
+const DEFAULT_TEMPLATES: Array<Omit<EmailTemplate, 'updated_at'>> = [
+  {
+    key: 'composer_system_prompt',
+    label: 'AI Reply — System Instructions',
+    description: 'Instructions sent to Claude when generating customer replies. Affects tone, length, and content rules. The LLM still writes the actual reply creatively — this shapes how.',
+    subject: null,
+    body: `You are writing a customer reply email on behalf of "{{business_name}}".
+
+RULES:
+- Be polite, professional, warm, and concise.
+- Start with a greeting using the customer's first name if available.
+- Briefly summarize what you understood about their request (1-2 sentences).
+- If there are things you need clarified, ask 1-3 SPECIFIC questions (not generic).
+- If this is an EMERGENCY: lead with safety instructions FIRST.
+- Keep it under 200 words (the HTML template handles formatting, signature, buttons).
+- Return ONLY the email body paragraphs as plain text. NO subject line, NO signature, NO HTML, NO markdown.
+- Separate paragraphs with a blank line.
+- Do NOT include the booking link as a URL — just write a sentence like "Click the button below to book your appointment" or "Use the link below to schedule."
+- Do NOT include the business name/phone sign-off — the template handles that.
+- Be human and warm, not robotic.
+- Never make promises about timing you can't keep.`,
+    body_format: 'system_prompt',
+    variables: ['business_name'],
+  },
+  {
+    key: 'fallback_reply_emergency',
+    label: 'Fallback Reply — Emergency',
+    description: 'Used when the LLM is unavailable AND the case is an emergency. Customer-facing plain text. Wrapped by the branded HTML template.',
+    subject: null,
+    body: `Hi {{customer_name}},
+
+Thank you for reaching out. We understand this is urgent and are treating it as a priority.
+
+If you are in any immediate danger, please call 911 first. For gas leaks, leave the building immediately and do not use any light switches or electronics.
+
+A technician from {{business_name}} will contact you within 15 minutes. You can also reach us directly at {{business_phone}}.
+
+Click the button below to confirm your emergency appointment.`,
+    body_format: 'text',
+    variables: ['customer_name', 'business_name', 'business_phone'],
+  },
+  {
+    key: 'fallback_reply_standard',
+    label: 'Fallback Reply — Standard',
+    description: 'Used when the LLM is unavailable for non-emergency cases. Plain text wrapped by the HTML template.',
+    subject: null,
+    body: `Hi {{customer_name}},
+
+Thank you for contacting {{business_name}} about {{problem_summary}}. We've received your message and want to help.
+
+To get started, click the button below to schedule a convenient time, or call us directly at {{business_phone}}.
+
+We look forward to assisting you!`,
+    body_format: 'text',
+    variables: ['customer_name', 'business_name', 'business_phone', 'problem_summary'],
+  },
+  {
+    key: 'followup_first',
+    label: 'Follow-up #1 (after initial reply)',
+    description: 'Sent to customers who received a reply but haven\'t booked within the first follow-up delay.',
+    subject: 'Following up on your {{trade}} request — {{business_name}}',
+    body: `Hi {{customer_name}},
+
+Just checking in! We received your request about {{problem_summary}} and wanted to make sure you were able to book an appointment.
+
+You can schedule at your convenience here:
+{{calcom_url}}
+
+Or if you'd prefer, give us a call at {{business_phone}} and we'll get you set up right away.
+
+Looking forward to helping!
+
+—
+{{business_name}}
+{{business_phone}}`,
+    body_format: 'text',
+    variables: ['customer_name', 'business_name', 'business_phone', 'trade', 'problem_summary', 'calcom_url'],
+  },
+  {
+    key: 'followup_second',
+    label: 'Follow-up #2 (last attempt)',
+    description: 'Sent as the final follow-up before the case is escalated to manual call list.',
+    subject: 'One more follow-up — {{business_name}}',
+    body: `Hi {{customer_name}},
+
+We wanted to follow up one more time on your {{trade}} request. We'd love to help!
+
+Book here: {{calcom_url}}
+Or call us: {{business_phone}}
+
+If you've already resolved the issue or no longer need service, no worries at all — just let us know and we'll close out your request.
+
+Best,
+{{business_name}}
+{{business_phone}}`,
+    body_format: 'text',
+    variables: ['customer_name', 'business_name', 'business_phone', 'trade', 'calcom_url'],
+  },
+];
+
+/**
+ * Upsert the default template set. ON CONFLICT DO NOTHING equivalent —
+ * existing rows are preserved, only missing keys are inserted. Safe to
+ * run repeatedly.
+ */
+export async function seedDefaultTemplates(): Promise<{ inserted: number; skipped: number }> {
+  const supabase = getSupabase();
+
+  // Fetch existing keys so we only insert the ones that are missing
+  const { data: existing } = await supabase
+    .from('email_templates')
+    .select('key');
+  const existingKeys = new Set(((existing || []) as Array<{ key: string }>).map((r) => r.key));
+
+  const missing = DEFAULT_TEMPLATES.filter((t) => !existingKeys.has(t.key));
+  if (missing.length === 0) {
+    return { inserted: 0, skipped: DEFAULT_TEMPLATES.length };
+  }
+
+  const { error } = await supabase.from('email_templates').insert(missing);
+  if (error) {
+    log.error({ error }, 'Failed to seed default templates');
+    throw new Error(error.message);
+  }
+
+  cache.clear();
+  log.info({ inserted: missing.length }, 'Seeded default templates');
+  return { inserted: missing.length, skipped: existingKeys.size };
+}
+
+/**
  * Render a template with {{variable}} substitution.
  * Unknown variables are left as-is (so they're visible in output — easier to debug).
  */

@@ -127,6 +127,32 @@ export default function SettingsPage() {
   const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
   const [templateDrafts, setTemplateDrafts] = useState<Record<string, { subject: string; body: string }>>({});
   const [templateSaving, setTemplateSaving] = useState<string | null>(null);
+  const [templateSeeding, setTemplateSeeding] = useState(false);
+  const [templateSeedResult, setTemplateSeedResult] = useState<string | null>(null);
+
+  const seedTemplates = async () => {
+    setTemplateSeeding(true);
+    setTemplateSeedResult(null);
+    try {
+      const res = await fetch('/api/templates/seed', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        // Re-fetch templates to refresh the list
+        const tplRes = await fetch('/api/templates');
+        if (tplRes.ok) {
+          const tplData = await tplRes.json();
+          setTemplates(tplData.templates || []);
+        }
+        setTemplateSeedResult(data.message || 'Seeded.');
+      } else {
+        setTemplateSeedResult(`Error: ${data.error || 'unknown'}`);
+      }
+    } catch (e) {
+      setTemplateSeedResult(`Error: ${e instanceof Error ? e.message : 'unknown'}`);
+    } finally {
+      setTemplateSeeding(false);
+    }
+  };
   const [resyncing, setResyncing] = useState(false);
   const [resyncResult, setResyncResult] = useState<string | null>(null);
   const [n8nApiKey, setN8nApiKey] = useState<string | null>(null);
@@ -537,8 +563,24 @@ export default function SettingsPage() {
           </div>
 
           {templates.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500 text-sm">
-              No templates found. Run migration 010 in Supabase to seed defaults.
+            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center space-y-3">
+              <p className="text-sm text-gray-600">No templates found.</p>
+              <p className="text-xs text-gray-500">
+                The migration may not have seeded, or the rows were cleared. Click below to insert the default set.
+              </p>
+              <button
+                onClick={seedTemplates}
+                disabled={templateSeeding}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#185FA5] text-white rounded-lg text-sm hover:bg-[#0C447C] disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${templateSeeding ? 'animate-spin' : ''}`} />
+                {templateSeeding ? 'Seeding...' : 'Seed default templates'}
+              </button>
+              {templateSeedResult && (
+                <p className={`text-xs ${templateSeedResult.startsWith('Error') ? 'text-red-600' : 'text-emerald-700'}`}>
+                  {templateSeedResult}
+                </p>
+              )}
             </div>
           ) : (
             templates.map((t) => {
