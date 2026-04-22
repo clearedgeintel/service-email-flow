@@ -45,7 +45,7 @@ export default function AnalyticsPage() {
   }, [range, router]);
 
   if (loading || !data) {
-    return <div className="p-6 text-gray-400">Loading analytics...</div>;
+    return <div className="p-6 text-gray-400 dark:text-gray-500">Loading analytics...</div>;
   }
 
   const dayData = Object.entries(data.byDay)
@@ -57,11 +57,11 @@ export default function AnalyticsPage() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Analytics</h1>
         <select
           value={range}
           onChange={(e) => setRange(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 rounded-lg text-sm"
         >
           <option value="7">Last 7 days</option>
           <option value="14">Last 14 days</option>
@@ -90,14 +90,14 @@ export default function AnalyticsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Volume Chart */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Daily Volume</h2>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Daily Volume</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dayData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={{ stroke: '#9ca3af' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={{ stroke: '#9ca3af' }} allowDecimals={false} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -106,8 +106,8 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Intent Distribution */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Intent Distribution</h2>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Intent Distribution</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -131,20 +131,20 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Status Breakdown */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">By Status</h2>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">By Status</h2>
           <div className="space-y-2">
             {Object.entries(data.byStatus).map(([status, count]) => (
               <div key={status} className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">{status.replace(/_/g, ' ')}</span>
+                <span className="text-gray-600 dark:text-gray-400">{status.replace(/_/g, ' ')}</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="w-24 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-blue-500 rounded-full"
                       style={{ width: `${(count / data.totalCases) * 100}%` }}
                     />
                   </div>
-                  <span className="font-medium text-gray-800 w-8 text-right">{count}</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-200 w-8 text-right">{count}</span>
                 </div>
               </div>
             ))}
@@ -152,8 +152,8 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Urgency Breakdown */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <h2 className="font-semibold text-gray-900 mb-4">By Urgency</h2>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">By Urgency</h2>
           <div className="space-y-2">
             {Object.entries(data.byUrgency).map(([urgency, count]) => {
               const colors: Record<string, string> = {
@@ -164,15 +164,15 @@ export default function AnalyticsPage() {
               };
               return (
                 <div key={urgency} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">{urgency}</span>
+                  <span className="text-gray-600 dark:text-gray-400">{urgency}</span>
                   <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="w-24 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full ${colors[urgency] || 'bg-gray-400'}`}
                         style={{ width: `${(count / data.totalCases) * 100}%` }}
                       />
                     </div>
-                    <span className="font-medium text-gray-800 w-8 text-right">{count}</span>
+                    <span className="font-medium text-gray-800 dark:text-gray-200 w-8 text-right">{count}</span>
                   </div>
                 </div>
               );
@@ -184,8 +184,8 @@ export default function AnalyticsPage() {
       {/* Voice Calls Section */}
       {data.voice && data.voice.totalCalls > 0 && (
         <div className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <PhoneCall className="w-5 h-5 text-[#185FA5]" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+            <PhoneCall className="w-5 h-5 text-[#185FA5] dark:text-[#378ADD]" />
             Voice Calls
           </h2>
 
@@ -214,31 +214,31 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h3 className="font-semibold text-gray-900 mb-4">Direction</h3>
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Direction</h3>
               <div className="space-y-2">
                 {Object.entries(data.voice.byDirection).map(([dir, count]) => (
                   <div key={dir} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 capitalize">{dir}</span>
+                    <span className="text-gray-600 dark:text-gray-400 capitalize">{dir}</span>
                     <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="w-24 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${dir === 'inbound' ? 'bg-blue-500' : 'bg-violet-500'}`}
                           style={{ width: `${data.voice!.totalCalls > 0 ? (count / data.voice!.totalCalls) * 100 : 0}%` }}
                         />
                       </div>
-                      <span className="font-medium text-gray-800 w-8 text-right">{count}</span>
+                      <span className="font-medium text-gray-800 dark:text-gray-200 w-8 text-right">{count}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h3 className="font-semibold text-gray-900 mb-4">Sentiment</h3>
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+              <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Sentiment</h3>
               <div className="space-y-2">
                 {Object.entries(data.voice.bySentiment).length === 0 ? (
-                  <p className="text-sm text-gray-400">No sentiment data yet</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500">No sentiment data yet</p>
                 ) : (
                   Object.entries(data.voice.bySentiment).map(([sent, count]) => {
                     const colors: Record<string, string> = {
@@ -249,15 +249,15 @@ export default function AnalyticsPage() {
                     };
                     return (
                       <div key={sent} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">{sent}</span>
+                        <span className="text-gray-600 dark:text-gray-400">{sent}</span>
                         <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="w-24 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full ${colors[sent] || 'bg-gray-400'}`}
                               style={{ width: `${data.voice!.totalCalls > 0 ? (count / data.voice!.totalCalls) * 100 : 0}%` }}
                             />
                           </div>
-                          <span className="font-medium text-gray-800 w-8 text-right">{count}</span>
+                          <span className="font-medium text-gray-800 dark:text-gray-200 w-8 text-right">{count}</span>
                         </div>
                       </div>
                     );
@@ -279,21 +279,21 @@ function StatCard({ icon: Icon, label, value, color }: {
   color: 'blue' | 'green' | 'red' | 'purple';
 }) {
   const iconColors = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    red: 'bg-red-100 text-red-600',
-    purple: 'bg-purple-100 text-purple-600',
+    blue: 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300',
+    green: 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-300',
+    red: 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300',
+    purple: 'bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-300',
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg ${iconColors[color]}`}>
           <Icon className="w-5 h-5" />
         </div>
         <div>
-          <p className="text-xs text-gray-500">{label}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
         </div>
       </div>
     </div>

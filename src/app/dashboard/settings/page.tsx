@@ -379,36 +379,36 @@ export default function SettingsPage() {
   };
 
   if (loading) {
-    return <div className="p-6 text-gray-400">Loading settings...</div>;
+    return <div className="p-6 text-gray-400 dark:text-gray-500">Loading settings...</div>;
   }
 
   return (
     <div className="p-6 max-w-4xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-6">Settings</h1>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+      <div className="flex gap-1 mb-6 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg w-fit">
         <button
           onClick={() => setTab('config')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'config' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'config' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
           Configuration
         </button>
         <button
           onClick={() => setTab('pricing')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'pricing' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'pricing' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
           Pricing Table
         </button>
         <button
           onClick={() => setTab('templates')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'templates' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'templates' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
           Email Templates
         </button>
         <button
           onClick={() => setTab('webhooks')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'webhooks' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === 'webhooks' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}
         >
           Webhooks
         </button>
@@ -427,36 +427,36 @@ export default function SettingsPage() {
           </div>
 
           {/* Create new */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="font-semibold text-gray-900 mb-3">Add Webhook</h3>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Add Webhook</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input
                 type="text"
                 placeholder="Name (e.g. Zapier - New cases)"
                 value={newWebhook.name}
                 onChange={(e) => setNewWebhook({ ...newWebhook, name: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
               <input
                 type="url"
                 placeholder="https://hooks.example.com/..."
                 value={newWebhook.url}
                 onChange={(e) => setNewWebhook({ ...newWebhook, url: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
               <input
                 type="text"
                 placeholder="Description (optional)"
                 value={newWebhook.description}
                 onChange={(e) => setNewWebhook({ ...newWebhook, description: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 col-span-full"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 placeholder:text-gray-400 dark:placeholder:text-gray-500 col-span-full"
               />
             </div>
             <div className="mt-3">
-              <p className="text-xs font-medium text-gray-600 mb-2">Events to subscribe to:</p>
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Events to subscribe to:</p>
               <div className="flex flex-wrap gap-2">
                 {availableEvents.map((ev) => (
-                  <label key={ev} className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2 py-1 cursor-pointer hover:bg-gray-50">
+                  <label key={ev} className="flex items-center gap-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
                     <input
                       type="checkbox"
                       checked={newWebhook.events.includes(ev)}
@@ -483,33 +483,33 @@ export default function SettingsPage() {
 
           {/* Existing webhooks */}
           {webhooks.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center text-gray-500 text-sm">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 text-center text-gray-500 dark:text-gray-400 text-sm">
               No webhooks configured yet.
             </div>
           ) : (
             webhooks.map((w) => (
-              <div key={w.id} className={`bg-white border rounded-xl p-5 ${w.active ? 'border-gray-200' : 'border-gray-200 opacity-60'}`}>
+              <div key={w.id} className={`bg-white dark:bg-gray-800 border rounded-xl p-5 ${w.active ? 'border-gray-200 dark:border-gray-700' : 'border-gray-200 dark:border-gray-700 opacity-60'}`}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-gray-900">{w.name}</h3>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${w.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{w.name}</h3>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${w.active ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'}`}>
                         {w.active ? 'active' : 'disabled'}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5 break-all">{w.url}</p>
-                    {w.description && <p className="text-xs text-gray-500 mt-1">{w.description}</p>}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 break-all">{w.url}</p>
+                    {w.description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{w.description}</p>}
                   </div>
                   <div className="flex gap-1 ml-2 shrink-0">
                     <button
                       onClick={() => testWebhook(w.id)}
-                      className="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                      className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
                       Test
                     </button>
                     <button
                       onClick={() => toggleWebhookActive(w.id, !w.active)}
-                      className="px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
+                      className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
                       {w.active ? 'Disable' : 'Enable'}
                     </button>
@@ -524,26 +524,26 @@ export default function SettingsPage() {
 
                 <div className="flex flex-wrap gap-1 mt-2">
                   {w.events.map((ev) => (
-                    <code key={ev} className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-[11px] font-mono">{ev}</code>
+                    <code key={ev} className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded text-[11px] font-mono">{ev}</code>
                   ))}
                 </div>
 
                 <div className="mt-3 text-xs">
                   <button
                     onClick={() => setRevealedSecrets({ ...revealedSecrets, [w.id]: !revealedSecrets[w.id] })}
-                    className="text-gray-500 hover:text-gray-700 underline"
+                    className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
                   >
                     {revealedSecrets[w.id] ? 'Hide' : 'Show'} signing secret
                   </button>
                   {revealedSecrets[w.id] && (
-                    <code className="block mt-1 p-2 bg-gray-50 border border-gray-200 rounded font-mono text-[11px] text-gray-700 break-all">
+                    <code className="block mt-1 p-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded font-mono text-[11px] text-gray-700 dark:text-gray-300 break-all">
                       {w.secret}
                     </code>
                   )}
                 </div>
 
                 {webhookTestResult[w.id] && (
-                  <p className="mt-2 text-xs text-gray-600">{webhookTestResult[w.id]}</p>
+                  <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">{webhookTestResult[w.id]}</p>
                 )}
               </div>
             ))
@@ -563,9 +563,9 @@ export default function SettingsPage() {
           </div>
 
           {templates.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center space-y-3">
-              <p className="text-sm text-gray-600">No templates found.</p>
-              <p className="text-xs text-gray-500">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 text-center space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400">No templates found.</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 The migration may not have seeded, or the rows were cleared. Click below to insert the default set.
               </p>
               <button
@@ -587,18 +587,18 @@ export default function SettingsPage() {
               const isEditing = editingTemplate === t.key;
               const draft = templateDrafts[t.key];
               return (
-                <div key={t.key} className="bg-white border border-gray-200 rounded-xl p-5">
+                <div key={t.key} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{t.label}</h3>
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{t.label}</h3>
                       {t.description && (
-                        <p className="text-xs text-gray-500 mt-1">{t.description}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t.description}</p>
                       )}
                     </div>
                     {!isEditing && (
                       <button
                         onClick={() => startEditingTemplate(t.key, t.subject, t.body)}
-                        className="ml-2 px-3 py-1.5 text-xs border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                        className="ml-2 px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
                       >
                         Edit
                       </button>
@@ -608,7 +608,7 @@ export default function SettingsPage() {
                   {t.variables.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-3">
                       {t.variables.map((v) => (
-                        <code key={v} className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-xs font-mono">
+                        <code key={v} className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded text-xs font-mono">
                           {'{{' + v + '}}'}
                         </code>
                       ))}
@@ -619,24 +619,24 @@ export default function SettingsPage() {
                     <div className="space-y-3">
                       {t.subject !== null && (
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Subject</label>
                           <input
                             type="text"
                             value={draft.subject}
                             onChange={(e) => setTemplateDrafts({ ...templateDrafts, [t.key]: { ...draft, subject: e.target.value } })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-[#185FA5] outline-none"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 focus:ring-2 focus:ring-[#185FA5] outline-none"
                           />
                         </div>
                       )}
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                           Body {t.body_format === 'system_prompt' ? '(LLM system prompt)' : ''}
                         </label>
                         <textarea
                           value={draft.body}
                           onChange={(e) => setTemplateDrafts({ ...templateDrafts, [t.key]: { ...draft, body: e.target.value } })}
                           rows={12}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 font-mono focus:ring-2 focus:ring-[#185FA5] outline-none"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 font-mono focus:ring-2 focus:ring-[#185FA5] outline-none"
                         />
                       </div>
                       <div className="flex gap-2">
@@ -649,7 +649,7 @@ export default function SettingsPage() {
                         </button>
                         <button
                           onClick={() => cancelEditingTemplate(t.key)}
-                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
+                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
                         >
                           Cancel
                         </button>
@@ -659,11 +659,11 @@ export default function SettingsPage() {
                     <div className="space-y-2">
                       {t.subject && (
                         <div>
-                          <span className="text-xs font-medium text-gray-500">Subject: </span>
-                          <span className="text-xs text-gray-700">{t.subject}</span>
+                          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Subject: </span>
+                          <span className="text-xs text-gray-700 dark:text-gray-300">{t.subject}</span>
                         </div>
                       )}
-                      <pre className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-800 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
+                      <pre className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
                         {t.body}
                       </pre>
                     </div>
@@ -678,17 +678,17 @@ export default function SettingsPage() {
       {tab === 'config' && (
         <div className="space-y-6">
           {SETTING_GROUPS.map((group) => (
-            <div key={group.title} className="bg-white border border-gray-200 rounded-xl p-5">
-              <h2 className="font-semibold text-gray-900 mb-4">{group.title}</h2>
+            <div key={group.title} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">{group.title}</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {group.fields.map((field) => (
                   <div key={field.key}>
-                    <label className="block text-sm font-medium text-gray-600 mb-1">{field.label}</label>
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{field.label}</label>
                     <input
                       type={field.type}
                       value={settings[field.key] || ''}
                       onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 outline-none"
                       step={field.type === 'number' ? '0.01' : undefined}
                     />
                   </div>
@@ -697,12 +697,12 @@ export default function SettingsPage() {
             </div>
           ))}
 
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-4">Reply Mode</h2>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Reply Mode</h2>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-900">Auto-send replies</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Auto-send replies</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   {settings.auto_reply === 'true'
                     ? 'Replies are sent automatically to customers'
                     : 'Replies are saved as Gmail drafts for your review (emergencies always send immediately)'}
@@ -717,10 +717,10 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
               <div>
-                <p className="text-sm font-medium text-gray-900">Smart scheduling (Cal.com slots)</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Smart scheduling (Cal.com slots)</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   {settings.smart_scheduling_enabled === 'true'
                     ? 'Reply emails include 3–5 tappable Cal.com time slots. Falls back to the generic booking link if the Cal.com API is unreachable.'
                     : 'Disabled — reply emails use the single generic booking link (current behavior).'}
@@ -735,10 +735,10 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
               <div>
-                <p className="text-sm font-medium text-gray-900">Retell AI voice agent</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Retell AI voice agent</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   {settings.retell_enabled === 'true'
                     ? 'Voice calls from Retell agents create/update cases. Configure your phone number to forward to Retell, and point Retell webhooks to /api/webhooks/retell.'
                     : 'Disabled — voice calls are not processed. Enable and configure API key + agent IDs below.'}
@@ -753,10 +753,10 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
               <div>
-                <p className="text-sm font-medium text-gray-900">Twilio SMS</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Twilio SMS</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   {settings.twilio_enabled === 'true'
                     ? 'Inbound SMS creates/updates cases. Outbound SMS triggerable from case detail. Point Twilio number webhook to /api/webhooks/twilio/sms and status callback to /api/webhooks/twilio/status.'
                     : 'Disabled — SMS is not processed. Enable and configure Account SID + Auth Token + From Number below.'}
@@ -771,10 +771,10 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
               <div>
-                <p className="text-sm font-medium text-gray-900">SMS auto-reply</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">SMS auto-reply</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   {settings.sms_auto_reply_enabled === 'true'
                     ? 'Inbound SMS triggers a Claude-generated reply. Throttle (below) prevents runaway loops if a customer rapid-fires texts.'
                     : 'Disabled — inbound SMS is recorded but never auto-replied. Enable to have Claude draft and send an SMS response.'}
@@ -789,10 +789,10 @@ export default function SettingsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
               <div>
-                <p className="text-sm font-medium text-gray-900">Business hours</p>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Business hours</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   {settings.business_hours_enabled === 'true'
                     ? 'Inbound voice calls outside hours are flagged and (if configured) routed to the after-hours agent. Outbound calls from the dashboard are blocked unless forced.'
                     : 'Disabled — treated as always open. Inbound calls use the default agent; outbound calls are never blocked.'}
@@ -808,12 +808,12 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
             <div className="flex items-center gap-2 mb-2">
-              <Tag className="w-4 h-4 text-gray-600" />
-              <h2 className="font-semibold text-gray-900">Gmail Labels</h2>
+              <Tag className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Gmail Labels</h2>
             </div>
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
               Sync ClearDesk labels to all existing cases in Gmail. New cases are labeled automatically;
               this retroactively applies labels to cases that existed before label sync was added
               (and migrates any legacy ServiceFlow/* labels to ClearDesk/*).
@@ -823,38 +823,38 @@ export default function SettingsPage() {
                 type="button"
                 onClick={resyncLabels}
                 disabled={resyncing}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
               >
                 <RefreshCw className={`w-4 h-4 ${resyncing ? 'animate-spin' : ''}`} />
                 {resyncing ? 'Syncing...' : 'Resync all labels'}
               </button>
               {resyncResult && (
-                <span className="text-sm text-gray-600">{resyncResult}</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">{resyncResult}</span>
               )}
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
             <div className="flex items-center gap-2 mb-2">
-              <Key className="w-4 h-4 text-gray-600" />
-              <h2 className="font-semibold text-gray-900">n8n Integration</h2>
+              <Key className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">n8n Integration</h2>
             </div>
-            <p className="text-xs text-gray-500 mb-3">
-              API key used by n8n workflows calling POST <code className="bg-gray-100 px-1 rounded">/api/n8n/callback</code>.
-              Send as <code className="bg-gray-100 px-1 rounded">Authorization: Bearer &lt;key&gt;</code>. Workflow templates
-              live in <code className="bg-gray-100 px-1 rounded">docs/n8n-workflows/</code>.
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              API key used by n8n workflows calling POST <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">/api/n8n/callback</code>.
+              Send as <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">Authorization: Bearer &lt;key&gt;</code>. Workflow templates
+              live in <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">docs/n8n-workflows/</code>.
             </p>
             <div className="flex items-center gap-2">
               <input
                 type={n8nKeyRevealed ? 'text' : 'password'}
                 value={n8nApiKey || '••••••••••••••••••••••••••••••••'}
                 readOnly
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono bg-gray-50 text-gray-700"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-mono bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300"
               />
               <button
                 type="button"
                 onClick={n8nKeyRevealed ? () => setN8nKeyRevealed(false) : revealN8nKey}
-                className="p-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"
+                className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
                 title={n8nKeyRevealed ? 'Hide' : 'Reveal'}
               >
                 {n8nKeyRevealed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -863,7 +863,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={rotateN8nKey}
                 disabled={n8nKeyRotating}
-                className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1.5"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 flex items-center gap-1.5"
                 title="Rotate (invalidates existing workflows)"
               >
                 <RefreshCw className={`w-4 h-4 ${n8nKeyRotating ? 'animate-spin' : ''}`} />
@@ -886,32 +886,32 @@ export default function SettingsPage() {
       {tab === 'pricing' && (
         <div className="space-y-6">
           {/* Pricing Table */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Trade</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Service</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Keywords</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Min</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Max</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Unit</th>
+                <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Trade</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Service</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Keywords</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Min</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Max</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Unit</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {pricing.filter(p => p.active).map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100">
+                  <tr key={item.id} className="border-b border-gray-100 dark:border-gray-700">
                     <td className="px-4 py-2.5 capitalize">{item.trade}</td>
                     <td className="px-4 py-2.5 font-medium">{item.service}</td>
-                    <td className="px-4 py-2.5 text-gray-500 max-w-xs truncate">{item.keywords.join(', ')}</td>
+                    <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 max-w-xs truncate">{item.keywords.join(', ')}</td>
                     <td className="px-4 py-2.5 text-right">${item.price_min}</td>
                     <td className="px-4 py-2.5 text-right">${item.price_max}</td>
                     <td className="px-4 py-2.5">{item.unit}</td>
                     <td className="px-4 py-2.5">
                       <button
                         onClick={() => deletePricingItem(item.id)}
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -923,13 +923,13 @@ export default function SettingsPage() {
           </div>
 
           {/* Add New Item */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="font-semibold text-gray-900 mb-3">Add Pricing Item</h3>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Add Pricing Item</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <select
                 value={newItem.trade}
                 onChange={(e) => setNewItem({ ...newItem, trade: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               >
                 <option value="electric">Electric</option>
                 <option value="plumbing">Plumbing</option>
@@ -938,33 +938,33 @@ export default function SettingsPage() {
                 placeholder="Service name"
                 value={newItem.service}
                 onChange={(e) => setNewItem({ ...newItem, service: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm col-span-2"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-900 dark:text-gray-100 col-span-2"
               />
               <input
                 placeholder="Keywords (comma-separated)"
                 value={newItem.keywords}
                 onChange={(e) => setNewItem({ ...newItem, keywords: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm col-span-3 sm:col-span-3"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-900 dark:text-gray-100 col-span-3 sm:col-span-3"
               />
               <input
                 type="number"
                 placeholder="Min $"
                 value={newItem.price_min}
                 onChange={(e) => setNewItem({ ...newItem, price_min: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
               <input
                 type="number"
                 placeholder="Max $"
                 value={newItem.price_max}
                 onChange={(e) => setNewItem({ ...newItem, price_max: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
               <input
                 placeholder="Unit (e.g. per job)"
                 value={newItem.unit}
                 onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-900 placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
             </div>
             <button
