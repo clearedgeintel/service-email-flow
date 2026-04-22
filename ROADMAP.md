@@ -1,15 +1,15 @@
-# ServiceFlow — Development Roadmap
+# ClearDesk — Development Roadmap
 
-> ClearDesk by ClearEdge Intelligence — AI email automation for service businesses. Production-ready single-tenant platform with full email pipeline, admin dashboard, customer portal, Cal.com smart scheduling, outbound webhook system, and Railway deployment.
+> ClearDesk by ClearEdge Intelligence — AI multi-channel customer-communication platform for service businesses. Email + Voice (Retell) + SMS (Twilio) with unified timeline, auto-reply, smart scheduling, outbound + inbound webhook integration, and Railway deployment.
 
-## Status Snapshot (as of 2026-04-15)
+## Status Snapshot (as of 2026-04-19)
 
-- **200 tests passing across 28 test files** (unit + integration)
-- **14 database migrations** applied
+- **257 tests passing across 33 test files** (unit + integration)
+- **18 database migrations** applied
 - **LLM:** Anthropic Claude Sonnet 4
-- **Voice:** Retell AI (inbound calls → auto-create cases)
+- **Channels:** Email (Gmail), Voice (Retell AI inbound + outbound), SMS (Twilio inbound + outbound + auto-reply)
 - **Deployed:** Railway (web + worker services, Redis plugin)
-- **Phases complete:** 0, 1, 2, 3, 4, 5, 6, 8.1, 8.2, 8.4, 8.5, 10.1 inbound
+- **Phases complete:** 0, 1, 2, 3, 4, 5, 6, 8.1, 8.2, 8.4, 8.5, **10.1 (voice)**, **10.2 (n8n)**, **10.3 (SMS)**, **10.4 (voice analytics)**
 
 ---
 
@@ -287,7 +287,7 @@ Core workflow that predates this roadmap:
 
 > Post-launch expansion: plug ServiceFlow into voice AI and low-code workflow automation to extend the pipeline beyond email.
 
-### 10.1 Retell AI Voice Agent
+### 10.1 Retell AI Voice Agent — COMPLETE
 - [x] Retell SDK installed, settings-backed API key + agent IDs
 - [x] DB migration 014: `calls` table (retell_call_id, case_id, direction, status,
   transcript, transcript_object, recording_url, sentiment, summary, custom_data)
@@ -298,35 +298,86 @@ Core workflow that predates this roadmap:
 - [x] `call.started`, `call.ended`, `call.analyzed` events emit outbound webhooks
 - [x] Settings → Retell AI Voice Agent section with enable toggle
 - [x] `docs/RETELL_SETUP.md` with full agent configuration guide
-- [ ] Outbound callback — trigger a Retell call from the case detail page
-- [ ] Dashboard: call history panel on case detail showing transcript + recording link
-- [ ] Store transcript as structured case event with speaker-labeled turns
-- [ ] After-hours fallback: configured in Settings, missed calls route to voice agent
-- [ ] Voice agent uses live business config via `retell_llm_dynamic_variables`
+- [x] Outbound callback — trigger a Retell call from the case detail page with live dynamic variables (business config, customer context)
+- [x] Dashboard: `/dashboard/calls` paginated/filterable list; voice analytics in `/dashboard/analytics` (total, duration, voicemail rate, success rate, direction + sentiment breakdowns)
+- [x] Store transcript as structured `VOICE_TRANSCRIPT` case event with speaker-labeled turns, rendered as chat bubbles in the timeline with inline audio
+- [x] After-hours fallback: `business_hours_*` settings, `isAfterHours()` helper, `retell_after_hours_agent_id` override. Inbound calls flagged with `after_hours=true`; outbound blocked unless forced
+- [x] Voice agent uses live business config via `retell_llm_dynamic_variables` — `call_inbound` webhook returns `business_name`, `business_phone`, `business_hours`, `is_after_hours`, `known_caller_name`
 
-### 10.2 n8n Workflow Integration
+### 10.2 n8n Workflow Integration — COMPLETE
 - [x] Generic webhook emission system (Phase 8.5) — DONE, all event types covered
 - [x] Webhook config via Settings → Webhooks tab — DONE
 - [x] HMAC-SHA256 signing on outgoing webhooks — DONE
-- [ ] Pre-built n8n workflow templates in `docs/n8n-templates/`:
-  - New case → Slack notification + HubSpot contact sync
-  - Booking confirmed → Google Calendar event + SMS confirmation to tech
-  - Case closed → customer satisfaction survey + QuickBooks invoice draft
-  - Emergency → PagerDuty + phone call to on-call tech
-- [ ] Incoming n8n callback API: `POST /api/n8n/action` lets n8n trigger ServiceFlow actions (close case, add note, escalate) with API key auth
-- [ ] Documentation: `docs/N8N_SETUP.md` with self-host or cloud setup, example workflows
+- [x] Inbound n8n callback API: `POST /api/n8n/callback` with Bearer auth, discriminated-union action dispatcher (`add_note`, `update_status`, `close_case`, `trigger_followup`, `add_event`). Rate-limited. Emits matching outbound webhooks so workflows can chain
+- [x] Dashboard API-key reveal/rotate at Settings → n8n Integration
+- [x] Pre-built templates in `docs/n8n-workflows/`:
+  - `01-slack-on-case-created.json` — Slack notification on `case.created`
+  - `02-sms-tech-on-emergency.json` — Twilio SMS on `case.classified` + EMERGENCY, with callback logging `TECH_NOTIFIED`
+  - `03-call-summary-email.json` — recap email on `call.ended`, with note callback
+- [x] `docs/n8n-workflows/README.md` — setup, payload shapes, callback actions, security
 
-### 10.3 Combined Voice + Email + Workflow Scenarios
-- [ ] Voice → Email → Booking: inbound call creates case, email pipeline sends confirmation with Cal.com link
-- [ ] Email → Callback: unclear/low-confidence email triggers Retell agent to call customer for clarification
-- [ ] Emergency escalation chain: emergency email → tech SMS → if no response in 5min → Retell outbound call → if still unreached → PagerDuty via n8n
-- [ ] Unified timeline: case detail page shows email + voice + n8n-triggered events in one chronological view
-- [ ] Channel preference: customer setting (stored per email) for preferred communication channel
+### 10.3 SMS Channel (Twilio) — COMPLETE
+- [x] DB migration 017: `sms_messages` table (twilio_sid, case_id, direction, status, body, media_urls, error_code, sent_at, delivered_at, received_at)
+- [x] Inbound webhook `/api/webhooks/twilio/sms` — signature-verified, idempotent on MessageSid, handles MMS media URLs, returns empty TwiML
+- [x] Status callback `/api/webhooks/twilio/status` — delivery-receipt updates on outbound rows
+- [x] Outbound send from case detail: `POST /api/cases/[id]/send-sms` with chat-bubble composer in UI
+- [x] Conversation history `GET /api/cases/[id]/messages`
+- [x] `sms.received` + `sms.sent` outbound webhook events for n8n chaining
+- [x] SMS auto-reply (migration 018) — on inbound, Claude drafts ≤320-char plain-text reply with SMS tone, 6-turn history context, business-hour emergency keyword handling, circuit-breaker fallback. Throttle (default 2 min) prevents storm loops. Off by default.
+- [x] `docs/TWILIO_SMS_SETUP.md` — credentials, number config, status callbacks, troubleshooting
 
-### 10.4 Voice Analytics
-- [ ] Call duration, hold time, resolution rate metrics
-- [ ] Call transcript sentiment analysis (re-use existing sentiment classifier)
-- [ ] Cost tracking (Retell + Twilio minutes used)
+### 10.4 Voice Analytics — COMPLETE
+- [x] Total calls, avg duration, voicemail rate, success rate stat cards
+- [x] Direction (inbound/outbound) + sentiment (Positive/Neutral/Negative) breakdown bars
+- [x] Voice section integrated into `/dashboard/analytics` alongside email metrics
+- [ ] Cost tracking (Retell minutes × rate + Twilio SMS count × rate)
+
+### 10.5 Unified UX — COMPLETE
+- [x] Unified activity timeline on case detail — email/voice/SMS/workflow events interleave chronologically as typed cards (no more three-panel stack)
+- [x] Channel-derived events deduped (raw rows take precedence over auto-logged events with matching IDs)
+- [x] Unified search on case list — searches email fields + call transcripts + SMS bodies in parallel; results intersect with status/urgency/intent filters
+- [x] Channel filter chips on case list (All / Email / Voice / SMS); source-channel icon next to case ID on each row
+- [x] Pending drafts filter + amber indicator on case rows; pending-draft chip (filters to cases with `draft_reply` populated)
+- [x] Dark mode on case detail page (all cards, modal, helper components)
+- [x] Full-email-body view — expand/collapse toggle + raw/cleaned source toggle on the case body card
+
+### 10.6 Combined Scenarios (deferred)
+- [ ] Email → Callback: unclear/low-confidence email triggers Retell outbound call for clarification
+- [ ] Emergency escalation chain: emergency email → tech SMS → no response in 5min → Retell outbound call → if still unreached → PagerDuty via n8n
+- [ ] Channel preference: customer-level setting for preferred communication channel, overrides per-event channel choice
+
+---
+
+## Phase 11: Calendar Integration (provider-agnostic) (P2)
+
+> Let admins see bookings + available slots + personal calendar in one view. Built around a `CalendarProvider` adapter interface so swapping or stacking Cal.com / Calendly / Google Calendar is a settings toggle, not a rewrite.
+
+### 11.1 Calendar Tab — Cal.com (IN PROGRESS)
+- [ ] `CalendarProvider` adapter interface: `listEvents(from, to)`, `listFreeSlots(from, to, eventTypeId?)`, optional `createBooking` + `verifyWebhook`
+- [ ] Cal.com adapter implementing the interface — reuses existing `calcom.service` slot + booking logic
+- [ ] New `/dashboard/calendar` route with week/month grid view
+- [ ] Renders ClearDesk bookings (from `email_cases.booking_*`) as solid blocks, links back to the case
+- [ ] Available Cal.com slots (per configured event type) rendered as faint outline blocks
+- [ ] Sidebar nav entry: "Calendar" between Calls and Analytics
+- [ ] Date range toggle (today / week / month); timezone respects `business_timezone` setting
+
+### 11.2 Google Calendar Adapter (read-only)
+- [ ] OAuth scope piggybacks on existing Gmail auth (add `calendar.readonly`)
+- [ ] Google adapter: `listEvents` only (no slot booking), returns admin's personal busy blocks
+- [ ] Calendar view overlays Google events as read-only "Busy (personal)" blocks so ClearDesk appointments don't conflict with your own calendar
+- [ ] Settings → Calendar: per-provider enable toggles
+
+### 11.3 Calendly Adapter
+- [ ] Calendly v2 API integration (PAT-based auth)
+- [ ] `listEvents` (booked events) + `listFreeSlots` (event type availability)
+- [ ] Webhook receiver for Calendly invitee events (`invitee.created`, `invitee.canceled`) — links to cases by customer email match
+- [ ] Settings → Calendly section (PAT, default event type, webhook signing secret)
+- [ ] `docs/CALENDLY_SETUP.md`
+
+### 11.4 Performance (only if needed)
+- [ ] Local `calendar_events` cache table with provider + remote_id unique key
+- [ ] Incremental sync worker (every N minutes) so the calendar view doesn't trigger 3× live API calls on every page load
+- [ ] Deferred until measured latency is a problem
 
 ---
 
@@ -335,7 +386,7 @@ Core workflow that predates this roadmap:
 | Phase | Focus | Priority | Estimated Scope |
 |-------|-------|----------|-----------------|
 | 0 | Core Pipeline | — | **COMPLETE** — 8 workers, analytics, settings, case actions |
-| 1 | Testing & Reliability | P0 | **COMPLETE** — 166 tests, CI pipeline |
+| 1 | Testing & Reliability | P0 | **COMPLETE** — 257 tests across 33 files, CI pipeline |
 | 2 | Security Hardening | P0 | **COMPLETE** — rate limiting, Zod validation, CSP headers, sanitization |
 | 3 | Resilience & Error Handling | P1 | **COMPLETE** — circuit breaker, timeouts, idempotency, fallbacks |
 | 4 | Monitoring & Observability | P1 | **COMPLETE** — metrics endpoint, PII masking, correlation IDs, queue health |
@@ -344,4 +395,5 @@ Core workflow that predates this roadmap:
 | 7 | Scaling & Performance | P2 | Pooling, caching, horizontal scale |
 | 8 | Feature Enhancements | P2 | **8.1 COMPLETE**, **8.2 COMPLETE** (customer portal), 8.3 multi-tenant (deferred), **8.4 COMPLETE** (smart scheduling), **8.5 COMPLETE** (Cal.com + webhooks) |
 | 9 | Documentation & DevEx | P3 | API spec, runbooks, dev tooling |
-| 10 | Voice Agents & Workflow Automation | P2 | **10.1 inbound COMPLETE** (Retell webhook + case auto-creation), outbound callbacks + dashboard panel remaining; 10.2 n8n core done via webhook system, templates + callback API remaining |
+| 10 | Multi-Channel (Voice + n8n + SMS + UX) | P2 | **10.1–10.5 COMPLETE** — Retell voice (in/out), n8n callback + templates, Twilio SMS + auto-reply, voice analytics, unified timeline + search + dark mode. 10.6 combined scenarios deferred |
+| 11 | Calendar Integration (provider-agnostic) | P2 | Adapter interface + Cal.com (in progress), then Google (read-only overlay), then Calendly |
