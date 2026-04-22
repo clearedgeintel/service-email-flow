@@ -21,6 +21,12 @@ interface FetchSlotsParams {
   daysAhead: number;
   maxSlots: number;
   /**
+   * Minimum lead time in minutes — slots closer than this to "now" get
+   * filtered out as insufficient runway. Defaults to 30. Set to 0 to
+   * offer the literal next-available slot (handy for demo/test).
+   */
+  minLeadMinutes?: number;
+  /**
    * Skip the 5-minute in-memory cache. Use for admin-triggered resends
    * where the previous run produced an empty result and the admin has
    * just corrected config — without this, the stale empty result sticks
@@ -50,12 +56,13 @@ interface CalcomSlotsResponse {
  */
 export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<SlotOption[]> {
   const { apiKey, eventTypeId, calcomUrl, timezone, daysAhead, maxSlots, bypassCache } = params;
+  const minLeadMinutes = typeof params.minLeadMinutes === 'number' ? params.minLeadMinutes : 30;
 
   if (!apiKey || !eventTypeId || eventTypeId <= 0) {
     return [];
   }
 
-  const cacheKey = `${eventTypeId}:${daysAhead}:${timezone}`;
+  const cacheKey = `${eventTypeId}:${daysAhead}:${timezone}:${minLeadMinutes}`;
   if (!bypassCache) {
     const cached = cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
@@ -109,11 +116,13 @@ export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<Slo
       return [];
     }
 
-    // Filter out slots that have already passed or are within the next
-    // 30 minutes (not enough runway for a tech to prep). This replaces the
-    // old "add 30 min to start date" buffer which never worked because the
-    // start param is a date, not a time.
-    const cutoff = Date.now() + 30 * 60 * 1000;
+    // Filter out slots that have already passed or are within the
+    // configured lead-time window (not enough runway for a tech to prep).
+    // This replaces the old "add 30 min to start date" buffer which never
+    // worked because the start param is a date, not a time. The lead
+    // window is configurable — default 30 min, set to 0 for demo/test
+    // where next-immediate availability should qualify.
+    const cutoff = Date.now() + Math.max(0, minLeadMinutes) * 60 * 1000;
     const allSlots = flattenAndFormat(body.data, calcomUrl, timezone);
     const slots = allSlots.filter((s) => {
       const t = new Date(s.iso).getTime();
