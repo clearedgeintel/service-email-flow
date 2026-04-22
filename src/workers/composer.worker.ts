@@ -5,14 +5,18 @@ import { composeAndSendReply } from '@/services/composer.service';
 
 const log = createChildLogger('composer');
 
-export function startComposerWorker() {
-  return createWorker<CaseJobData>(
-    QUEUE_NAMES.COMPOSER,
-    async (job: Job<CaseJobData>) => {
-      const { caseId } = job.data;
-      log.info({ caseId }, 'Composing customer reply...');
+export interface ComposerJobData extends CaseJobData {
+  bypassSlotCache?: boolean;
+}
 
-      await composeAndSendReply(caseId);
+export function startComposerWorker() {
+  return createWorker<ComposerJobData>(
+    QUEUE_NAMES.COMPOSER,
+    async (job: Job<ComposerJobData>) => {
+      const { caseId, bypassSlotCache } = job.data;
+      log.info({ caseId, bypassSlotCache }, 'Composing customer reply...');
+
+      await composeAndSendReply(caseId, { bypassSlotCache });
     },
     2, // concurrency
   );

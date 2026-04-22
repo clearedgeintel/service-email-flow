@@ -20,6 +20,14 @@ interface FetchSlotsParams {
   timezone: string;
   daysAhead: number;
   maxSlots: number;
+  /**
+   * Skip the 5-minute in-memory cache. Use for admin-triggered resends
+   * where the previous run produced an empty result and the admin has
+   * just corrected config — without this, the stale empty result sticks
+   * around until TTL expires. Cache is also rewritten with the fresh
+   * result so subsequent calls benefit.
+   */
+  bypassCache?: boolean;
 }
 
 // Simple in-memory cache so repeat calls within 5 min don't hammer Cal.com.
@@ -41,16 +49,22 @@ interface CalcomSlotsResponse {
  * Returns [] on any failure (graceful degradation to generic booking link).
  */
 export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<SlotOption[]> {
-  const { apiKey, eventTypeId, calcomUrl, timezone, daysAhead, maxSlots } = params;
+  const { apiKey, eventTypeId, calcomUrl, timezone, daysAhead, maxSlots, bypassCache } = params;
 
   if (!apiKey || !eventTypeId || eventTypeId <= 0) {
     return [];
   }
 
   const cacheKey = `${eventTypeId}:${daysAhead}:${timezone}`;
-  const cached = cache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.slots.slice(0, maxSlots);
+  if (!bypassCache) {
+    const cached = cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.slots.slice(0, maxSlots);
+    }
+  } else {
+    // Drop any stale entry so a concurrent non-bypass call gets the fresh
+    // result once we populate below.
+    cache.delete(cacheKey);
   }
 
   try {
