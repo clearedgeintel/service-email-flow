@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
-import { getQueue, QUEUE_NAMES, CaseJobData } from '@/lib/queue';
+import { getQueue, QUEUE_NAMES } from '@/lib/queue';
 import { logCaseEvent } from '@/services/case-event.service';
-import { clearSlotCache } from '@/services/cal-slots.service';
 import { EventType } from '@/types/events';
+import type { ComposerJobData } from '@/workers/composer.worker';
 
 export async function POST(
   _request: NextRequest,
@@ -23,15 +23,14 @@ export async function POST(
     .update({ customer_reply_sent: false, customer_reply_at: null })
     .eq('id', caseId);
 
-  // Bust the Cal.com slot cache. The composer memoizes slots for 5 min
-  // keyed on eventTypeId:daysAhead:timezone; without this, an admin
-  // correcting a "no slots offered" draft by clicking Resend would keep
-  // hitting the same cached empty result until TTL expired.
-  clearSlotCache();
-
-  // Enqueue composer job
+  // Enqueue composer job with bypassSlotCache. The slot cache is in-memory
+  // per process — on Railway, web and worker are separate processes, so
+  // clearing cache here wouldn't touch the worker's cache. Instead we flag
+  // this specific job as cache-bypass so the worker forces a fresh Cal.com
+  // fetch. This is the path to use when an admin has just corrected config
+  // that caused an initial empty-slot result to be cached.
   const queue = getQueue(QUEUE_NAMES.COMPOSER);
-  await queue.add('resend', { caseId } as CaseJobData);
+  await queue.add('resend', { caseId, bypassSlotCache: true } as ComposerJobData);
 
   await logCaseEvent({
     caseId,

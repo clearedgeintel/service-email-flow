@@ -347,6 +347,38 @@ describe('fetchAvailableSlots', () => {
     }
   });
 
+  it('bypassCache: true forces a fresh fetch even with cached result', async () => {
+    // First call: Cal.com returns empty. Gets cached.
+    // Second call with bypassCache: Cal.com returns real slots. Should be
+    // fetched and returned, not the cached empty.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(mockCalcomResponse({}))
+      .mockResolvedValueOnce(
+        mockCalcomResponse({
+          '2099-08-15': ['2099-08-15T10:00:00.000-05:00'],
+        }),
+      );
+    global.fetch = fetchMock;
+
+    const params = {
+      apiKey: 'cal_test',
+      eventTypeId: 42,
+      calcomUrl: 'https://cal.com/me/x',
+      timezone: 'America/Chicago',
+      daysAhead: 7,
+      maxSlots: 3,
+    };
+
+    const first = await fetchAvailableSlots(params);
+    expect(first).toEqual([]);
+
+    // Without bypass, second call would hit cache → still []
+    // With bypass, second call re-fetches → gets the real slots
+    const second = await fetchAvailableSlots({ ...params, bypassCache: true });
+    expect(second).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('caches results within the TTL window', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       mockCalcomResponse({

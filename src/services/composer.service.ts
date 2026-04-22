@@ -12,7 +12,14 @@ import { EventType } from '@/types/events';
 
 const log = createChildLogger('composer');
 
-export async function composeAndSendReply(caseId: number): Promise<void> {
+export interface ComposeOptions {
+  /** Force-refresh Cal.com slots (skip the 5-min in-memory cache).
+   *  Used for admin-triggered resends so a stale empty cached result
+   *  from a misconfigured initial run doesn't stick. */
+  bypassSlotCache?: boolean;
+}
+
+export async function composeAndSendReply(caseId: number, options: ComposeOptions = {}): Promise<void> {
   const supabase = getSupabase();
 
   const { data: row, error: fetchError } = await supabase
@@ -57,7 +64,7 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
   const { calcomUrl, calcomLabel } = await selectCalcomLink(row.intent, row.urgency_level, isEmergency);
 
   // Smart scheduling: fetch 3-5 available Cal.com slots (if configured).
-  const slotOptions = await fetchSlotsForCase(row.intent, isEmergency, calcomUrl, row.id);
+  const slotOptions = await fetchSlotsForCase(row.intent, isEmergency, calcomUrl, row.id, options.bypassSlotCache);
 
   // Generate customer portal status token for "Check your case status" link
   const { getOrCreateCaseToken, buildStatusUrl } = await import('./case-token.service');
@@ -260,6 +267,7 @@ async function fetchSlotsForCase(
   isEmergency: boolean,
   calcomUrl: string,
   caseId?: number,
+  bypassCache?: boolean,
 ) {
   const enabledRaw = await getConfig<unknown>('smart_scheduling_enabled', false);
   const enabled = enabledRaw === true || enabledRaw === 'true';
@@ -315,15 +323,16 @@ async function fetchSlotsForCase(
     timezone,
     daysAhead,
     maxSlots: Math.min(Math.max(maxSlots, 1), 5),
+    bypassCache,
   });
 
   if (slots.length === 0) {
     log.warn(
-      { caseId, intent, eventTypeId: eventTypeIdNum, daysAhead, timezone },
+      { caseId, intent, eventTypeId: eventTypeIdNum, daysAhead, timezone, bypassCache },
       'No slots offered — Cal.com returned empty (all booked, filtered as past, or API error)',
     );
   } else {
-    log.info({ caseId, count: slots.length, eventTypeId: eventTypeIdNum }, 'Slots fetched for reply');
+    log.info({ caseId, count: slots.length, eventTypeId: eventTypeIdNum, bypassCache }, 'Slots fetched for reply');
   }
 
   return slots;
