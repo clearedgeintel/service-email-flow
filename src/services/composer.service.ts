@@ -306,14 +306,19 @@ async function fetchSlotsForCase(
     return [];
   }
 
-  const [timezone, daysAheadRaw, maxSlotsRaw] = await Promise.all([
+  const [timezone, daysAheadRaw, maxSlotsRaw, minLeadRaw] = await Promise.all([
     getConfig<string>('business_timezone', 'America/Chicago'),
     getConfig<number>('slot_suggestion_days', 7),
     getConfig<number>('slot_suggestion_count', 3),
+    getConfig<number>('slot_suggestion_min_lead_minutes', 30),
   ]);
 
   const daysAhead = typeof daysAheadRaw === 'number' ? daysAheadRaw : parseInt(String(daysAheadRaw), 10) || 7;
   const maxSlots = typeof maxSlotsRaw === 'number' ? maxSlotsRaw : parseInt(String(maxSlotsRaw), 10) || 3;
+  const minLeadMinutes = typeof minLeadRaw === 'number'
+    ? minLeadRaw
+    : parseInt(String(minLeadRaw), 10);
+  const leadMin = isNaN(minLeadMinutes) ? 30 : Math.max(0, minLeadMinutes);
 
   const { fetchAvailableSlots } = await import('@/services/cal-slots.service');
   const slots = await fetchAvailableSlots({
@@ -323,16 +328,17 @@ async function fetchSlotsForCase(
     timezone,
     daysAhead,
     maxSlots: Math.min(Math.max(maxSlots, 1), 5),
+    minLeadMinutes: leadMin,
     bypassCache,
   });
 
   if (slots.length === 0) {
     log.warn(
-      { caseId, intent, eventTypeId: eventTypeIdNum, daysAhead, timezone, bypassCache },
-      'No slots offered — Cal.com returned empty (all booked, filtered as past, or API error)',
+      { caseId, intent, eventTypeId: eventTypeIdNum, daysAhead, timezone, leadMin, bypassCache },
+      'No slots offered — Cal.com returned empty (all booked, all filtered by lead-time window, or API error)',
     );
   } else {
-    log.info({ caseId, count: slots.length, eventTypeId: eventTypeIdNum, bypassCache }, 'Slots fetched for reply');
+    log.info({ caseId, count: slots.length, eventTypeId: eventTypeIdNum, leadMin, bypassCache }, 'Slots fetched for reply');
   }
 
   return slots;

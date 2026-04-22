@@ -62,6 +62,7 @@ const SETTING_GROUPS = [
       { key: 'business_timezone', label: 'Business Timezone (IANA)', type: 'text' },
       { key: 'slot_suggestion_days', label: 'Days of availability to query', type: 'number' },
       { key: 'slot_suggestion_count', label: 'Slots to show in email (1-5)', type: 'number' },
+      { key: 'slot_suggestion_min_lead_minutes', label: 'Minimum lead time (minutes, 0 = next-available)', type: 'number' },
     ],
   },
   {

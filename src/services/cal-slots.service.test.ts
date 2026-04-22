@@ -317,7 +317,7 @@ describe('fetchAvailableSlots', () => {
     }
   });
 
-  it('drops slots within the next 30 minutes (insufficient runway)', async () => {
+  it('drops slots within the configured lead-time window (default 30 min)', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2099-07-15T17:00:00.000Z')); // noon Central
 
@@ -342,6 +342,69 @@ describe('fetchAvailableSlots', () => {
 
       expect(slots).toHaveLength(1);
       expect(slots[0].iso).toBe('2099-07-15T13:00:00.000-05:00');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('minLeadMinutes: 0 includes near-term slots (demo/test mode)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-07-15T17:00:00.000Z')); // noon Central
+
+    global.fetch = vi.fn().mockResolvedValue(
+      mockCalcomResponse({
+        '2099-07-15': [
+          '2099-07-15T12:05:00.000-05:00', // 5 min from now
+          '2099-07-15T12:15:00.000-05:00', // 15 min from now
+          '2099-07-15T13:00:00.000-05:00', // 1 hour from now
+        ],
+      }),
+    );
+
+    try {
+      const slots = await fetchAvailableSlots({
+        apiKey: 'cal_test',
+        eventTypeId: 42,
+        calcomUrl: 'https://cal.com/me/x',
+        timezone: 'America/Chicago',
+        daysAhead: 1,
+        maxSlots: 5,
+        minLeadMinutes: 0,
+      });
+
+      // All three future slots included when lead time is 0
+      expect(slots).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('custom minLeadMinutes: 60 drops slots within 1 hour', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-07-15T17:00:00.000Z')); // noon Central
+
+    global.fetch = vi.fn().mockResolvedValue(
+      mockCalcomResponse({
+        '2099-07-15': [
+          '2099-07-15T12:30:00.000-05:00', // 30 min — dropped (inside 60)
+          '2099-07-15T13:30:00.000-05:00', // 90 min — kept
+        ],
+      }),
+    );
+
+    try {
+      const slots = await fetchAvailableSlots({
+        apiKey: 'cal_test',
+        eventTypeId: 42,
+        calcomUrl: 'https://cal.com/me/x',
+        timezone: 'America/Chicago',
+        daysAhead: 1,
+        maxSlots: 5,
+        minLeadMinutes: 60,
+      });
+
+      expect(slots).toHaveLength(1);
+      expect(slots[0].iso).toBe('2099-07-15T13:30:00.000-05:00');
     } finally {
       vi.useRealTimers();
     }
