@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StatusBadge, UrgencyBadge, IntentBadge } from '@/components/status-badge';
-import { Search, RefreshCw, ChevronLeft, ChevronRight, Filter, Download, Bookmark, X as CloseIcon, AlertTriangle, X as XIcon, Activity, Mail, PhoneCall, MessageCircle } from 'lucide-react';
+import { Search, RefreshCw, ChevronLeft, ChevronRight, Filter, Download, Bookmark, X as CloseIcon, AlertTriangle, X as XIcon, Activity, Mail, PhoneCall, MessageCircle, MessageSquare } from 'lucide-react';
 
 interface CaseRow {
   id: number;
@@ -19,6 +19,7 @@ interface CaseRow {
   received_at: string;
   customer_reply_sent: boolean;
   tech_notified: boolean;
+  draft_reply: { type?: 'reply' | 'followup' } | null;
 }
 
 function ChannelIcon({ gmailId }: { gmailId: string }) {
@@ -84,6 +85,7 @@ function CaseQueueContent() {
   const urgency = searchParams.get('urgency') || '';
   const search = searchParams.get('search') || '';
   const channel = searchParams.get('channel') || '';
+  const hasDraft = searchParams.get('has_draft') || '';
 
   // Load saved filters from localStorage
   useEffect(() => {
@@ -105,6 +107,7 @@ function CaseQueueContent() {
     if (urgency) params.set('urgency', urgency);
     if (search) params.set('search', search);
     if (channel) params.set('channel', channel);
+    if (hasDraft) params.set('has_draft', hasDraft);
 
     try {
       const res = await fetch(`/api/cases?${params}`);
@@ -130,7 +133,7 @@ function CaseQueueContent() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, status, intent, urgency, search, channel, router]);
+  }, [page, status, intent, urgency, search, channel, hasDraft, router]);
 
   useEffect(() => {
     fetchCases();
@@ -201,6 +204,7 @@ function CaseQueueContent() {
     if (urgency) params.set('urgency', urgency);
     if (search) params.set('search', search);
     if (channel) params.set('channel', channel);
+    if (hasDraft) params.set('has_draft', hasDraft);
     window.location.href = `/api/cases/export?${params}`;
   };
 
@@ -260,6 +264,7 @@ function CaseQueueContent() {
     if (urgency) current.urgency = urgency;
     if (search) current.search = search;
     if (channel) current.channel = channel;
+    if (hasDraft) current.has_draft = hasDraft;
 
     const updated = [...savedFilters, { name: newFilterName.trim(), params: current }];
     setSavedFilters(updated);
@@ -474,6 +479,21 @@ function CaseQueueContent() {
                   </button>
                 );
               })}
+
+              <span className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" aria-hidden />
+
+              <button
+                onClick={() => updateFilter('has_draft', hasDraft === 'true' ? '' : 'true')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                  hasDraft === 'true'
+                    ? 'bg-amber-500 text-white border-amber-500'
+                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+                title="Show only cases with a draft reply awaiting approval"
+              >
+                <MessageSquare className="w-3 h-3" />
+                Pending drafts
+              </button>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -642,6 +662,12 @@ function CaseQueueContent() {
                       <div className="flex items-center gap-1.5">
                         <ChannelIcon gmailId={c.gmail_message_id} />
                         <span className="font-mono text-gray-500 dark:text-gray-400">#{c.id}</span>
+                        {c.draft_reply && (
+                          <MessageSquare
+                            className="w-3.5 h-3.5 text-amber-500"
+                            aria-label={c.draft_reply.type === 'followup' ? 'Follow-up draft pending' : 'Draft reply pending'}
+                          />
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 cursor-pointer" onClick={() => router.push(`/dashboard/cases/${c.id}`)}>
@@ -703,6 +729,7 @@ function CaseQueueContent() {
                   </div>
                   <span className="flex items-center gap-1 text-xs text-gray-400 ml-2 whitespace-nowrap">
                     <ChannelIcon gmailId={c.gmail_message_id} />
+                    {c.draft_reply && <MessageSquare className="w-3 h-3 text-amber-500" aria-label="Draft pending" />}
                     #{c.id}
                   </span>
                 </div>

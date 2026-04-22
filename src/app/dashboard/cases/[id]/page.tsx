@@ -57,6 +57,7 @@ interface CaseDetail {
   from_name: string | null;
   subject: string | null;
   body_cleaned: string | null;
+  body_raw: string | null;
   status: string;
   intent: string | null;
   confidence: number | null;
@@ -122,6 +123,8 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   const [noteText, setNoteText] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
   const [showDraftHtml, setShowDraftHtml] = useState(false);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
+  const [showRawBody, setShowRawBody] = useState(false);
 
   const fetchCase = async () => {
     try {
@@ -201,11 +204,11 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
   };
 
   if (loading) {
-    return <div className="p-6 text-gray-400">Loading case...</div>;
+    return <div className="p-6 text-gray-400 dark:text-gray-500">Loading case...</div>;
   }
 
   if (!caseData) {
-    return <div className="p-6 text-gray-400">Case not found</div>;
+    return <div className="p-6 text-gray-400 dark:text-gray-500">Case not found</div>;
   }
 
   const c = caseData;
@@ -214,17 +217,17 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
     <div className="p-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <Link href="/dashboard" className="p-2 rounded-lg hover:bg-gray-100">
-          <ArrowLeft className="w-5 h-5 text-gray-500" />
+        <Link href="/dashboard" className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+          <ArrowLeft className="w-5 h-5 text-gray-500 dark:text-gray-400" />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">Case #{c.id}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Case #{c.id}</h1>
             <StatusBadge status={c.status} />
             {c.urgency_level && <UrgencyBadge urgency={c.urgency_level} />}
             {c.intent && <IntentBadge intent={c.intent} />}
           </div>
-          <p className="text-sm text-gray-500 mt-1">{c.subject || '(no subject)'}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{c.subject || '(no subject)'}</p>
         </div>
       </div>
 
@@ -233,37 +236,37 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         <div className="lg:col-span-2 space-y-6">
           {/* Draft Reply Preview */}
           {c.draft_reply && (
-            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-5">
+            <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700 rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-amber-700" />
-                  <h2 className="font-semibold text-amber-900">
+                  <MessageSquare className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                  <h2 className="font-semibold text-amber-900 dark:text-amber-200">
                     {c.draft_reply.type === 'followup'
                       ? `Pending Follow-up #${c.draft_reply.followup_number || '?'}`
                       : 'Pending Draft Reply'}
                   </h2>
                   {c.draft_reply.used_fallback && (
-                    <span className="text-xs bg-amber-200 text-amber-900 px-2 py-0.5 rounded">Template fallback</span>
+                    <span className="text-xs bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 px-2 py-0.5 rounded">Template fallback</span>
                   )}
                 </div>
                 <button
                   onClick={() => setShowDraftHtml(!showDraftHtml)}
-                  className="text-xs text-amber-700 hover:underline"
+                  className="text-xs text-amber-700 dark:text-amber-300 hover:underline"
                 >
                   {showDraftHtml ? 'Show text' : 'Show HTML preview'}
                 </button>
               </div>
-              <div className="text-xs text-amber-800 mb-2">
+              <div className="text-xs text-amber-800 dark:text-amber-200 mb-2">
                 <div><strong>To:</strong> {c.draft_reply.to}</div>
                 <div><strong>Subject:</strong> {c.draft_reply.subject}</div>
               </div>
               {showDraftHtml ? (
                 <div
-                  className="bg-white border border-amber-200 rounded-lg p-3 max-h-96 overflow-y-auto"
+                  className="bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded-lg p-3 max-h-96 overflow-y-auto"
                   dangerouslySetInnerHTML={{ __html: c.draft_reply.body_html }}
                 />
               ) : (
-                <pre className="bg-white border border-amber-200 rounded-lg p-3 text-sm text-gray-800 whitespace-pre-wrap font-sans max-h-96 overflow-y-auto">
+                <pre className="bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap font-sans max-h-96 overflow-y-auto">
                   {c.draft_reply.body_text}
                 </pre>
               )}
@@ -279,7 +282,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 <button
                   onClick={() => runAction('discard-reply')}
                   disabled={actionLoading === 'discard-reply'}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
                 >
                   <X className="w-4 h-4" />
                   Discard
@@ -289,8 +292,8 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* Customer Info */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Customer Information</h2>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Customer Information</h2>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <InfoRow icon={User} label="Name" value={c.customer_name} />
               <InfoRow icon={Mail} label="Email" value={c.customer_email || c.from_email} />
@@ -305,41 +308,41 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           {c.booking_id && (
             <div className={`border rounded-xl p-5 ${
               c.booking_status === 'cancelled'
-                ? 'bg-red-50 border-red-200'
+                ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'
                 : c.booking_status === 'completed'
-                  ? 'bg-gray-50 border-gray-200'
-                  : 'bg-green-50 border-green-200'
+                  ? 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                  : 'bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-800'
             }`}>
               <div className="flex items-center gap-2 mb-3">
                 <CheckCircle2 className={`w-5 h-5 ${
-                  c.booking_status === 'cancelled' ? 'text-red-600' :
-                  c.booking_status === 'completed' ? 'text-gray-600' : 'text-green-600'
+                  c.booking_status === 'cancelled' ? 'text-red-600 dark:text-red-400' :
+                  c.booking_status === 'completed' ? 'text-gray-600 dark:text-gray-400' : 'text-green-600 dark:text-green-400'
                 }`} />
-                <h2 className="font-semibold text-gray-900">
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100">
                   Appointment {c.booking_status === 'booked' ? 'Booked' : c.booking_status === 'cancelled' ? 'Cancelled' : c.booking_status === 'completed' ? 'Completed' : 'Scheduled'}
                 </h2>
               </div>
               <dl className="space-y-1.5 text-sm">
                 {c.booking_start_at && (
                   <div className="flex justify-between">
-                    <dt className="text-gray-600">Start</dt>
-                    <dd className="text-gray-900 font-medium">{new Date(c.booking_start_at).toLocaleString()}</dd>
+                    <dt className="text-gray-600 dark:text-gray-400">Start</dt>
+                    <dd className="text-gray-900 dark:text-gray-100 font-medium">{new Date(c.booking_start_at).toLocaleString()}</dd>
                   </div>
                 )}
                 {c.booking_end_at && (
                   <div className="flex justify-between">
-                    <dt className="text-gray-600">End</dt>
-                    <dd className="text-gray-900 font-medium">{new Date(c.booking_end_at).toLocaleString()}</dd>
+                    <dt className="text-gray-600 dark:text-gray-400">End</dt>
+                    <dd className="text-gray-900 dark:text-gray-100 font-medium">{new Date(c.booking_end_at).toLocaleString()}</dd>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <dt className="text-gray-600">Booking ID</dt>
-                  <dd className="text-gray-500 font-mono text-xs">{c.booking_id}</dd>
+                  <dt className="text-gray-600 dark:text-gray-400">Booking ID</dt>
+                  <dd className="text-gray-500 dark:text-gray-500 font-mono text-xs">{c.booking_id}</dd>
                 </div>
                 {c.booking_cancelled_reason && (
                   <div className="flex justify-between">
-                    <dt className="text-gray-600">Reason</dt>
-                    <dd className="text-gray-800">{c.booking_cancelled_reason}</dd>
+                    <dt className="text-gray-600 dark:text-gray-400">Reason</dt>
+                    <dd className="text-gray-800 dark:text-gray-200">{c.booking_cancelled_reason}</dd>
                   </div>
                 )}
               </dl>
@@ -347,36 +350,59 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* Problem Summary */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Problem Summary</h2>
-            <p className="text-sm text-gray-700">{c.problem_summary || 'No summary available'}</p>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Problem Summary</h2>
+            <p className="text-sm text-gray-700 dark:text-gray-300">{c.problem_summary || 'No summary available'}</p>
             {c.requested_service && (
-              <p className="text-sm text-gray-500 mt-2">Requested: {c.requested_service}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Requested: {c.requested_service}</p>
             )}
             {c.classification_reasons && c.classification_reasons.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1">
                 {c.classification_reasons.map((r, i) => (
-                  <span key={i} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{r}</span>
+                  <span key={i} className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs">{r}</span>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Email Body */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Email Body</h2>
-            <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
-              {c.body_cleaned || '(empty)'}
+          {/* Email / Source Content */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">
+                {c.gmail_message_id?.startsWith('retell:') ? 'Voice Call (original)' :
+                  c.gmail_message_id?.startsWith('sms:') ? 'SMS (original)' : 'Email Body'}
+              </h2>
+              <div className="flex items-center gap-2 text-xs">
+                {c.body_raw && c.body_raw !== c.body_cleaned && (
+                  <button
+                    onClick={() => setShowRawBody(!showRawBody)}
+                    className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                  >
+                    {showRawBody ? 'Cleaned' : 'Raw (with quotes/headers)'}
+                  </button>
+                )}
+                <button
+                  onClick={() => setBodyExpanded(!bodyExpanded)}
+                  className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                >
+                  {bodyExpanded ? 'Collapse' : 'Expand'}
+                </button>
+              </div>
+            </div>
+            <pre className={`text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans overflow-y-auto ${
+              bodyExpanded ? '' : 'max-h-64'
+            }`}>
+              {(showRawBody ? c.body_raw : c.body_cleaned) || c.body_cleaned || c.body_raw || '(empty)'}
             </pre>
           </div>
 
           {/* Notes */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Notes</h2>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Notes</h2>
             {c.notes ? (
-              <p className="text-sm text-gray-700 whitespace-pre-wrap mb-3">{c.notes}</p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap mb-3">{c.notes}</p>
             ) : (
-              <p className="text-sm text-gray-400 mb-3">No notes yet</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mb-3">No notes yet</p>
             )}
             <div className="flex gap-2">
               <input
@@ -385,12 +411,12 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 onChange={(e) => setNoteText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addNote()}
                 placeholder="Add a note..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
               <button
                 onClick={addNote}
                 disabled={!noteText.trim() || actionLoading === 'add-note'}
-                className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-900 disabled:opacity-50"
+                className="px-4 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-900 dark:hover:bg-gray-600 disabled:opacity-50"
               >
                 Add
               </button>
@@ -398,8 +424,8 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           </div>
 
           {/* Unified Activity Feed */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Activity</h2>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Activity</h2>
             <UnifiedTimeline
               events={timeline}
               calls={calls}
@@ -412,11 +438,11 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* SMS Composer (separate card — composing new messages is an action, not activity) */}
           {c.customer_phone && (
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
               <div className="flex items-center gap-2 mb-3">
-                <MessageCircle className="w-4 h-4 text-[#185FA5]" />
-                <h2 className="font-semibold text-gray-900">Send SMS</h2>
-                <span className="text-xs text-gray-400">to {c.customer_phone}</span>
+                <MessageCircle className="w-4 h-4 text-[#185FA5] dark:text-[#378ADD]" />
+                <h2 className="font-semibold text-gray-900 dark:text-gray-100">Send SMS</h2>
+                <span className="text-xs text-gray-400 dark:text-gray-500">to {c.customer_phone}</span>
               </div>
               <div className="flex gap-2">
                 <textarea
@@ -425,7 +451,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                   placeholder="Type a message..."
                   maxLength={1600}
                   rows={2}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm resize-none focus:ring-2 focus:ring-blue-500 outline-none"
                   disabled={smsSending}
                 />
                 <button
@@ -438,8 +464,8 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
                 </button>
               </div>
               <div className="flex items-center justify-between mt-1">
-                <span className="text-[11px] text-gray-400">{smsBody.length}/1600</span>
-                {smsError && <span className="text-[11px] text-red-600">{smsError}</span>}
+                <span className="text-[11px] text-gray-400 dark:text-gray-500">{smsBody.length}/1600</span>
+                {smsError && <span className="text-[11px] text-red-600 dark:text-red-400">{smsError}</span>}
               </div>
             </div>
           )}
@@ -448,8 +474,8 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
         {/* Sidebar — Actions + Meta */}
         <div className="space-y-6">
           {/* Actions */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Actions</h2>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Actions</h2>
             <div className="space-y-2">
               <ActionButton
                 icon={RefreshCw}
@@ -525,15 +551,15 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
               />
             </div>
             {actionResult && (
-              <p className={`text-xs mt-3 ${actionResult.startsWith('✓') ? 'text-emerald-700' : 'text-red-700'}`}>
+              <p className={`text-xs mt-3 ${actionResult.startsWith('✓') ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                 {actionResult}
               </p>
             )}
           </div>
 
           {/* Case Meta */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h2 className="font-semibold text-gray-900 mb-3">Details</h2>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Details</h2>
             <dl className="space-y-2 text-sm">
               <MetaRow label="Confidence" value={c.confidence ? `${(c.confidence * 100).toFixed(0)}%` : '—'} />
               <MetaRow label="Reply Sent" value={c.customer_reply_sent ? `Yes (${formatDate(c.customer_reply_at)})` : 'No'} />
@@ -553,34 +579,34 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           onClick={() => setSelectedEvent(null)}
         >
           <div
-            className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col"
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
               <div>
-                <h3 className="font-semibold text-gray-900">{selectedEvent.event_type.replace(/_/g, ' ')}</h3>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">{selectedEvent.event_type.replace(/_/g, ' ')}</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   {new Date(selectedEvent.created_at).toLocaleString()} · by {selectedEvent.actor}
                 </p>
               </div>
               <button
                 onClick={() => setSelectedEvent(null)}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
             </div>
             <div className="p-5 overflow-y-auto flex-1">
               {selectedEvent.summary && (
                 <div className="mb-4">
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">Summary</h4>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{selectedEvent.summary}</p>
+                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Summary</h4>
+                  <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{selectedEvent.summary}</p>
                 </div>
               )}
               {selectedEvent.metadata && Object.keys(selectedEvent.metadata).length > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">Metadata</h4>
-                  <pre className="text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-x-auto font-mono text-gray-800">
+                  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Metadata</h4>
+                  <pre className="text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 overflow-x-auto font-mono text-gray-800 dark:text-gray-200">
                     {JSON.stringify(selectedEvent.metadata, null, 2)}
                   </pre>
                 </div>
@@ -639,7 +665,7 @@ function UnifiedTimeline({
   ].sort((a, b) => a.at - b.at);
 
   if (items.length === 0) {
-    return <p className="text-sm text-gray-400">No activity yet</p>;
+    return <p className="text-sm text-gray-400 dark:text-gray-500">No activity yet</p>;
   }
 
   return (
@@ -668,20 +694,20 @@ function EventRow({ evt, onClick }: { evt: TimelineEvent; onClick: () => void })
   return (
     <button
       onClick={onClick}
-      className="w-full flex gap-3 text-sm text-left p-2 rounded-lg hover:bg-gray-50 transition-colors"
+      className="w-full flex gap-3 text-sm text-left p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
     >
       <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-gray-800">{evt.event_type.replace(/_/g, ' ')}</span>
-          <span className="text-xs text-gray-400">
+          <span className="font-medium text-gray-800 dark:text-gray-200">{evt.event_type.replace(/_/g, ' ')}</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">
             {new Date(evt.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </span>
           {evt.actor !== 'system' && (
-            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{evt.actor}</span>
+            <span className="text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded">{evt.actor}</span>
           )}
         </div>
-        {evt.summary && <p className="text-gray-600 mt-0.5 truncate">{evt.summary}</p>}
+        {evt.summary && <p className="text-gray-600 dark:text-gray-400 mt-0.5 truncate">{evt.summary}</p>}
       </div>
     </button>
   );
@@ -700,38 +726,38 @@ function CallRow({ call, expanded, onToggle }: {
     <div className="flex gap-3 text-sm p-2 rounded-lg">
       <div className="w-2 h-2 rounded-full bg-violet-400 mt-1.5 shrink-0" />
       <div className="flex-1 min-w-0">
-        <button onClick={onToggle} className="w-full text-left hover:bg-gray-50 rounded-md -m-1 p-1 transition-colors">
+        <button onClick={onToggle} className="w-full text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-md -m-1 p-1 transition-colors">
           <div className="flex items-center gap-2 flex-wrap">
-            <PhoneCall className="w-3.5 h-3.5 text-violet-600" />
-            <span className="font-medium text-gray-800">Voice call</span>
-            <span className="text-[11px] text-gray-500 capitalize">{call.direction}</span>
-            {duration && <span className="text-[11px] text-gray-500">· {duration}</span>}
-            {otherParty && <span className="text-[11px] text-gray-500">· {otherParty}</span>}
+            <PhoneCall className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+            <span className="font-medium text-gray-800 dark:text-gray-200">Voice call</span>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400 capitalize">{call.direction}</span>
+            {duration && <span className="text-[11px] text-gray-500 dark:text-gray-400">· {duration}</span>}
+            {otherParty && <span className="text-[11px] text-gray-500 dark:text-gray-400">· {otherParty}</span>}
             {call.sentiment && (
               <span className={`text-[11px] px-1.5 py-0.5 rounded ${
-                call.sentiment === 'Positive' ? 'bg-emerald-50 text-emerald-700' :
-                call.sentiment === 'Negative' ? 'bg-red-50 text-red-700' :
-                'bg-slate-50 text-slate-600'
+                call.sentiment === 'Positive' ? 'bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' :
+                call.sentiment === 'Negative' ? 'bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-300' :
+                'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
               }`}>{call.sentiment}</span>
             )}
             {call.in_voicemail && (
-              <span className="text-[11px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded">Voicemail</span>
+              <span className="text-[11px] bg-amber-50 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded">Voicemail</span>
             )}
-            <span className="text-xs text-gray-400 ml-auto">
+            <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
               {call.started_at
                 ? new Date(call.started_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : '—'}
             </span>
           </div>
           {call.summary && !expanded && (
-            <p className="text-gray-600 mt-0.5 truncate">{call.summary}</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-0.5 truncate">{call.summary}</p>
           )}
         </button>
 
         {expanded && (
           <div className="mt-2 space-y-2">
             {call.summary && (
-              <p className="text-xs text-gray-600 italic border-l-2 border-gray-200 pl-2">{call.summary}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 italic border-l-2 border-gray-200 dark:border-gray-600 pl-2">{call.summary}</p>
             )}
             {call.recording_url && (
               <audio controls src={call.recording_url} className="w-full h-8" />
@@ -746,8 +772,8 @@ function CallRow({ call, expanded, onToggle }: {
                     <div
                       className={`px-2.5 py-1.5 rounded-lg max-w-[85%] ${
                         t.role === 'agent'
-                          ? 'bg-violet-50 text-violet-900 border border-violet-100'
-                          : 'bg-blue-50 text-blue-900 border border-blue-100'
+                          ? 'bg-violet-50 dark:bg-violet-900/40 text-violet-900 dark:text-violet-100 border border-violet-100 dark:border-violet-800'
+                          : 'bg-blue-50 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100 border border-blue-100 dark:border-blue-800'
                       }`}
                     >
                       <div className="text-[10px] font-medium opacity-60 mb-0.5 capitalize">
@@ -759,24 +785,24 @@ function CallRow({ call, expanded, onToggle }: {
                 ))}
               </div>
             ) : call.transcript ? (
-              <pre className="text-[11px] text-gray-700 whitespace-pre-wrap font-sans bg-gray-50 border border-gray-200 rounded p-2 max-h-64 overflow-y-auto">
+              <pre className="text-[11px] text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-2 max-h-64 overflow-y-auto">
                 {call.transcript}
               </pre>
             ) : (
-              <p className="text-xs text-gray-400">No transcript available</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">No transcript available</p>
             )}
             {call.custom_data && Object.keys(call.custom_data).length > 0 && (
               <dl className="text-[11px] space-y-0.5">
                 {Object.entries(call.custom_data).map(([k, v]) => (
                   <div key={k} className="flex gap-2">
-                    <dt className="text-gray-500 font-mono">{k}:</dt>
-                    <dd className="text-gray-800">{String(v)}</dd>
+                    <dt className="text-gray-500 dark:text-gray-400 font-mono">{k}:</dt>
+                    <dd className="text-gray-800 dark:text-gray-200">{String(v)}</dd>
                   </div>
                 ))}
               </dl>
             )}
             {call.disconnection_reason && (
-              <p className="text-[11px] text-gray-500">
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
                 Ended: {call.disconnection_reason.replace(/_/g, ' ')}
               </p>
             )}
@@ -809,12 +835,12 @@ function SmsRow({ msg }: { msg: SmsMessage }) {
       <div className="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-1">
-          <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="font-medium text-gray-800">SMS</span>
-          <span className="text-[11px] text-gray-500 capitalize">{msg.direction}</span>
-          <span className="text-[11px] text-gray-500">· {msg.status}</span>
-          {msg.error_code && <span className="text-[11px] text-red-600">· {msg.error_code}</span>}
-          <span className="text-xs text-gray-400 ml-auto">
+          <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span className="font-medium text-gray-800 dark:text-gray-200">SMS</span>
+          <span className="text-[11px] text-gray-500 dark:text-gray-400 capitalize">{msg.direction}</span>
+          <span className="text-[11px] text-gray-500 dark:text-gray-400">· {msg.status}</span>
+          {msg.error_code && <span className="text-[11px] text-red-600 dark:text-red-400">· {msg.error_code}</span>}
+          <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
             {new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>
@@ -822,8 +848,8 @@ function SmsRow({ msg }: { msg: SmsMessage }) {
           <div
             className={`max-w-[80%] px-3 py-2 rounded-lg border text-sm ${
               isOutbound
-                ? 'bg-blue-50 text-blue-900 border-blue-100'
-                : 'bg-gray-50 text-gray-900 border-gray-200'
+                ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100 border-blue-100 dark:border-blue-800'
+                : 'bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-600'
             }`}
           >
             <p className="whitespace-pre-wrap">{msg.body || <em>(no body)</em>}</p>
@@ -846,10 +872,10 @@ function SmsRow({ msg }: { msg: SmsMessage }) {
 function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | null }) {
   return (
     <div className="flex items-start gap-2">
-      <Icon className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+      <Icon className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-0.5 shrink-0" />
       <div>
-        <div className="text-xs text-gray-400">{label}</div>
-        <div className="text-gray-800">{value || '—'}</div>
+        <div className="text-xs text-gray-400 dark:text-gray-500">{label}</div>
+        <div className="text-gray-800 dark:text-gray-200">{value || '—'}</div>
       </div>
     </div>
   );
@@ -863,10 +889,10 @@ function ActionButton({ icon: Icon, label, onClick, loading, variant }: {
   variant?: 'danger' | 'muted';
 }) {
   const colors = variant === 'danger'
-    ? 'border-red-200 text-red-700 hover:bg-red-50'
+    ? 'border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40'
     : variant === 'muted'
-      ? 'border-gray-200 text-gray-500 hover:bg-gray-50'
-      : 'border-gray-200 text-gray-700 hover:bg-gray-50';
+      ? 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50';
 
   return (
     <button
@@ -883,8 +909,8 @@ function ActionButton({ icon: Icon, label, onClick, loading, variant }: {
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="text-gray-800 font-medium">{value}</dd>
+      <dt className="text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className="text-gray-800 dark:text-gray-200 font-medium">{value}</dd>
     </div>
   );
 }
