@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
 import { getQueue, QUEUE_NAMES, CaseJobData } from '@/lib/queue';
 import { logCaseEvent } from '@/services/case-event.service';
+import { clearSlotCache } from '@/services/cal-slots.service';
 import { EventType } from '@/types/events';
 
 export async function POST(
@@ -21,6 +22,12 @@ export async function POST(
     .from('email_cases')
     .update({ customer_reply_sent: false, customer_reply_at: null })
     .eq('id', caseId);
+
+  // Bust the Cal.com slot cache. The composer memoizes slots for 5 min
+  // keyed on eventTypeId:daysAhead:timezone; without this, an admin
+  // correcting a "no slots offered" draft by clicking Resend would keep
+  // hitting the same cached empty result until TTL expired.
+  clearSlotCache();
 
   // Enqueue composer job
   const queue = getQueue(QUEUE_NAMES.COMPOSER);

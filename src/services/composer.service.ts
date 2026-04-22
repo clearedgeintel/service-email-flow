@@ -57,7 +57,7 @@ export async function composeAndSendReply(caseId: number): Promise<void> {
   const { calcomUrl, calcomLabel } = await selectCalcomLink(row.intent, row.urgency_level, isEmergency);
 
   // Smart scheduling: fetch 3-5 available Cal.com slots (if configured).
-  const slotOptions = await fetchSlotsForCase(row.intent, isEmergency, calcomUrl);
+  const slotOptions = await fetchSlotsForCase(row.intent, isEmergency, calcomUrl, row.id);
 
   // Generate customer portal status token for "Check your case status" link
   const { getOrCreateCaseToken, buildStatusUrl } = await import('./case-token.service');
@@ -259,27 +259,44 @@ async function fetchSlotsForCase(
   intent: string | null,
   isEmergency: boolean,
   calcomUrl: string,
+  caseId?: number,
 ) {
   const enabledRaw = await getConfig<unknown>('smart_scheduling_enabled', false);
   const enabled = enabledRaw === true || enabledRaw === 'true';
-  if (!enabled) return [];
+  if (!enabled) {
+    log.info({ caseId, reason: 'smart_scheduling_disabled' }, 'No slots offered — toggle is off');
+    return [];
+  }
 
   const apiKey = await getConfig<string>('calcom_api_key', '');
-  if (!apiKey) return [];
+  if (!apiKey) {
+    log.warn({ caseId, reason: 'no_calcom_api_key' }, 'No slots offered — calcom_api_key is empty');
+    return [];
+  }
 
   // Pick the right event type ID mirroring selectCalcomLink's routing
   let eventTypeId = 0;
+  let eventTypeSource: string;
   if (isEmergency) {
     eventTypeId = await getConfig<number>('calcom_event_type_emergency', 0);
+    eventTypeSource = 'calcom_event_type_emergency';
   } else if (intent === 'REPAIR_REQUEST') {
     eventTypeId = await getConfig<number>('calcom_event_type_service', 0);
+    eventTypeSource = 'calcom_event_type_service';
   } else {
     eventTypeId = await getConfig<number>('calcom_event_type_estimate', 0);
+    eventTypeSource = 'calcom_event_type_estimate';
   }
 
   // Coerce string values from JSONB storage
   const eventTypeIdNum = typeof eventTypeId === 'number' ? eventTypeId : parseInt(String(eventTypeId), 10);
-  if (!eventTypeIdNum || isNaN(eventTypeIdNum)) return [];
+  if (!eventTypeIdNum || isNaN(eventTypeIdNum)) {
+    log.warn(
+      { caseId, intent, isEmergency, eventTypeSource, configured: eventTypeId },
+      `No slots offered — ${eventTypeSource} is not configured (or zero)`,
+    );
+    return [];
+  }
 
   const [timezone, daysAheadRaw, maxSlotsRaw] = await Promise.all([
     getConfig<string>('business_timezone', 'America/Chicago'),
@@ -291,7 +308,7 @@ async function fetchSlotsForCase(
   const maxSlots = typeof maxSlotsRaw === 'number' ? maxSlotsRaw : parseInt(String(maxSlotsRaw), 10) || 3;
 
   const { fetchAvailableSlots } = await import('@/services/cal-slots.service');
-  return fetchAvailableSlots({
+  const slots = await fetchAvailableSlots({
     apiKey,
     eventTypeId: eventTypeIdNum,
     calcomUrl,
@@ -299,6 +316,17 @@ async function fetchSlotsForCase(
     daysAhead,
     maxSlots: Math.min(Math.max(maxSlots, 1), 5),
   });
+
+  if (slots.length === 0) {
+    log.warn(
+      { caseId, intent, eventTypeId: eventTypeIdNum, daysAhead, timezone },
+      'No slots offered — Cal.com returned empty (all booked, filtered as past, or API error)',
+    );
+  } else {
+    log.info({ caseId, count: slots.length, eventTypeId: eventTypeIdNum }, 'Slots fetched for reply');
+  }
+
+  return slots;
 }
 
 async function generateReplyText(params: {
