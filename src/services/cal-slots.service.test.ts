@@ -214,6 +214,109 @@ describe('fetchAvailableSlots', () => {
     }
   });
 
+  it('labels same-day slots "Today" and next-day slots "Tomorrow"', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-07-15T17:00:00.000Z')); // noon Central
+
+    global.fetch = vi.fn().mockResolvedValue(
+      mockCalcomResponse({
+        '2099-07-15': ['2099-07-15T14:00:00.000-05:00'], // today 2pm CT
+        '2099-07-16': ['2099-07-16T09:00:00.000-05:00'], // tomorrow 9am CT
+        '2099-07-17': ['2099-07-17T09:00:00.000-05:00'], // day after
+      }),
+    );
+
+    try {
+      const slots = await fetchAvailableSlots({
+        apiKey: 'cal_test',
+        eventTypeId: 42,
+        calcomUrl: 'https://cal.com/me/x',
+        timezone: 'America/Chicago',
+        daysAhead: 7,
+        maxSlots: 5,
+      });
+
+      expect(slots).toHaveLength(3);
+      expect(slots[0].date_display).toMatch(/^Today,/);
+      expect(slots[1].date_display).toMatch(/^Tomorrow,/);
+      expect(slots[2].date_display).not.toMatch(/^(Today|Tomorrow),/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('falls through to tomorrow when today has no slots', async () => {
+    // Urgency=TODAY case filed at 3pm Central but today is fully booked.
+    // Cal.com returns zero for today + normal slots for tomorrow. The
+    // customer should still get tomorrow's earliest offers in the reply.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-07-15T20:00:00.000Z')); // 3pm Central
+
+    global.fetch = vi.fn().mockResolvedValue(
+      mockCalcomResponse({
+        '2099-07-15': [],                                   // today: nothing
+        '2099-07-16': [
+          '2099-07-16T09:00:00.000-05:00',                  // tomorrow 9am
+          '2099-07-16T10:30:00.000-05:00',                  // tomorrow 10:30am
+          '2099-07-16T14:00:00.000-05:00',                  // tomorrow 2pm
+        ],
+      }),
+    );
+
+    try {
+      const slots = await fetchAvailableSlots({
+        apiKey: 'cal_test',
+        eventTypeId: 42,
+        calcomUrl: 'https://cal.com/me/x',
+        timezone: 'America/Chicago',
+        daysAhead: 7,
+        maxSlots: 3,
+      });
+
+      expect(slots).toHaveLength(3);
+      expect(slots.every((s) => s.iso.startsWith('2099-07-16'))).toBe(true);
+      expect(slots[0].iso).toBe('2099-07-16T09:00:00.000-05:00');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('falls through to tomorrow when every slot today is already past', async () => {
+    // Evening case: Cal.com returns some today slots but all are before now.
+    // Those get filtered out; tomorrow's slots take their place.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-07-16T02:00:00.000Z')); // 9pm Central (today)
+
+    global.fetch = vi.fn().mockResolvedValue(
+      mockCalcomResponse({
+        '2099-07-15': [
+          '2099-07-15T09:00:00.000-05:00',  // passed
+          '2099-07-15T14:00:00.000-05:00',  // passed
+        ],
+        '2099-07-16': [
+          '2099-07-16T09:00:00.000-05:00',  // tomorrow morning
+          '2099-07-16T11:00:00.000-05:00',
+        ],
+      }),
+    );
+
+    try {
+      const slots = await fetchAvailableSlots({
+        apiKey: 'cal_test',
+        eventTypeId: 42,
+        calcomUrl: 'https://cal.com/me/x',
+        timezone: 'America/Chicago',
+        daysAhead: 7,
+        maxSlots: 3,
+      });
+
+      expect(slots).toHaveLength(2);
+      expect(slots.every((s) => s.iso.startsWith('2099-07-16'))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('drops slots within the next 30 minutes (insufficient runway)', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2099-07-15T17:00:00.000Z')); // noon Central

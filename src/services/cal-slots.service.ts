@@ -138,14 +138,27 @@ function flattenAndFormat(
   const slots: SlotOption[] = [];
   const dates = Object.keys(data).sort();
 
+  const todayInTz = formatDateInTimezone(new Date(), timezone);
+  const tomorrowInTz = formatDateInTimezone(
+    new Date(Date.now() + 24 * 60 * 60 * 1000),
+    timezone,
+  );
+
   for (const date of dates) {
     for (const iso of data[date]) {
       const d = new Date(iso);
       if (isNaN(d.getTime())) continue;
 
+      // Replace the weekday label with "Today" / "Tomorrow" when applicable
+      // so urgency=TODAY customers see same-day options unambiguously.
+      const slotDate = formatDateInTimezone(d, timezone);
+      let dateDisplay = dateFormatter.format(d);
+      if (slotDate === todayInTz) dateDisplay = `Today, ${dateFormatter.format(d).replace(/^\w+,\s*/, '')}`;
+      else if (slotDate === tomorrowInTz) dateDisplay = `Tomorrow, ${dateFormatter.format(d).replace(/^\w+,\s*/, '')}`;
+
       slots.push({
         iso,
-        date_display: dateFormatter.format(d),
+        date_display: dateDisplay,
         time_display: timeFormatter.format(d),
         booking_url: buildBookingUrl(calcomUrl, iso),
       });
