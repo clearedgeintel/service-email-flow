@@ -224,6 +224,97 @@ export function clearSlotCache(): void {
   cache.clear();
 }
 
+export interface RawCalcomProbeResult {
+  request: {
+    url: string;             // with eventTypeId, start, end, timeZone — no auth
+    method: 'GET';
+    headers: Record<string, string>; // Authorization redacted to "Bearer ***"
+  };
+  response: {
+    ok: boolean;
+    status: number | null;   // null if network/abort
+    error?: string;
+    body: unknown;           // parsed JSON body, or raw text if JSON parse fails
+  };
+  /** Count of slot ISOs across all date buckets in a standard Cal.com response */
+  slot_count_returned?: number;
+  /** The YYYY-MM-DD start and end the request used, post-timezone fix */
+  computed_start: string;
+  computed_end: string;
+}
+
+/**
+ * Make a single live call to Cal.com /slots and return the raw request +
+ * response for debugging. Skips cache entirely. Used by the slot-diagnostic
+ * endpoint when ?raw=true — lets an admin see exactly what Cal.com sent
+ * back without having to install Cal.com's own API explorer or grep logs.
+ */
+export async function probeCalcomSlots(params: {
+  apiKey: string;
+  eventTypeId: number;
+  timezone: string;
+  daysAhead: number;
+}): Promise<RawCalcomProbeResult> {
+  const { apiKey, eventTypeId, timezone, daysAhead } = params;
+  const now = new Date();
+  const start = formatDateInTimezone(now, timezone);
+  const end = formatDateInTimezone(new Date(now.getTime() + daysAhead * 86400_000), timezone);
+
+  const url = new URL(`${CALCOM_API_BASE}/slots`);
+  url.searchParams.set('eventTypeId', String(eventTypeId));
+  url.searchParams.set('start', start);
+  url.searchParams.set('end', end);
+  url.searchParams.set('timeZone', timezone);
+
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    'cal-api-version': CALCOM_API_VERSION,
+    Accept: 'application/json',
+  };
+  const redactedHeaders = {
+    ...headers,
+    Authorization: 'Bearer ***',
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(url.toString(), { method: 'GET', headers, signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    const rawText = await res.text();
+    let parsed: unknown;
+    try { parsed = JSON.parse(rawText); } catch { parsed = rawText; }
+
+    let slotCount: number | undefined;
+    if (parsed && typeof parsed === 'object' && 'data' in parsed) {
+      const data = (parsed as { data: unknown }).data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        slotCount = Object.values(data as Record<string, unknown>)
+          .reduce<number>((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);
+      }
+    }
+
+    return {
+      request: { url: url.toString(), method: 'GET', headers: redactedHeaders },
+      response: { ok: res.ok, status: res.status, body: parsed },
+      slot_count_returned: slotCount,
+      computed_start: start,
+      computed_end: end,
+    };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    const isAbort = err instanceof Error && err.name === 'AbortError';
+    return {
+      request: { url: url.toString(), method: 'GET', headers: redactedHeaders },
+      response: { ok: false, status: null, error: isAbort ? 'timeout' : String(err), body: null },
+      computed_start: start,
+      computed_end: end,
+    };
+  }
+}
+
 /** Render slots as a plain-text list for inclusion in LLM prompts */
 export function slotsToPromptText(slots: SlotOption[]): string {
   if (slots.length === 0) return '';

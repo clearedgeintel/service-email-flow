@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase';
 import { getConfig } from '@/lib/config';
-import { fetchAvailableSlots, clearSlotCache } from '@/services/cal-slots.service';
+import { fetchAvailableSlots, clearSlotCache, probeCalcomSlots } from '@/services/cal-slots.service';
 
 /**
  * GET /api/cases/[id]/slot-diagnostic
@@ -11,13 +11,20 @@ import { fetchAvailableSlots, clearSlotCache } from '@/services/cal-slots.servic
  * reply. Runs the same gate chain as the composer, plus a live Cal.com call,
  * and returns a structured report. Bypasses the slot cache so the result
  * reflects the live state of Cal.com.
+ *
+ * Query params:
+ *   ?raw=true — also include the raw Cal.com request URL + response body in
+ *   the output, so admins can see exactly what Cal.com sent back. Auth token
+ *   is redacted.
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const authError = await requireAuth();
   if (authError) return authError;
+
+  const includeRaw = request.nextUrl.searchParams.get('raw') === 'true';
 
   const { id } = await params;
   const caseId = parseInt(id);
@@ -98,6 +105,11 @@ export async function GET(
   const leadMin = typeof minLeadRaw === 'number' ? minLeadRaw : parseInt(String(minLeadRaw), 10);
   const minLeadMinutes = isNaN(leadMin) ? 30 : Math.max(0, leadMin);
 
+  // Raw Cal.com round-trip if requested
+  const raw = includeRaw
+    ? await probeCalcomSlots({ apiKey, eventTypeId, timezone, daysAhead: daysAheadNum })
+    : null;
+
   // Fetch WITH the configured lead filter (what the composer would see)
   const slots = await fetchAvailableSlots({
     apiKey,
@@ -137,6 +149,7 @@ export async function GET(
         reason: 'all_slots_within_lead_window',
         message: `Cal.com has ${slotsNoLead.length} slot(s), but all are within the current ${minLeadMinutes}-minute lead-time window. Lower "slot_suggestion_min_lead_minutes" in Settings (set to 0 for testing).`,
         preview_if_lead_zero: slotsNoLead.slice(0, 3).map((s) => `${s.date_display} · ${s.time_display}`),
+        ...(raw && { raw_calcom: raw }),
       });
     }
 
@@ -152,6 +165,7 @@ export async function GET(
       min_lead_minutes: minLeadMinutes,
       reason: 'calcom_returned_empty',
       message: 'Cal.com returned no slots at all (even with lead-time filter disabled). Possible causes: event type has no availability set, all slots are booked, Cal.com API is down, or the booking URL hasn\'t synced availability yet.',
+      ...(raw && { raw_calcom: raw }),
     });
   }
 
@@ -168,5 +182,6 @@ export async function GET(
     reason: 'ok',
     first_slot: slots[0],
     preview: slots.slice(0, 3).map((s) => `${s.date_display} · ${s.time_display}`),
+    ...(raw && { raw_calcom: raw }),
   });
 }
