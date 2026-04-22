@@ -31,6 +31,7 @@ export const CaseQuerySchema = z.object({
   to: z.string().optional(),
   search: z.string().max(200).optional(),
   channel: z.enum(['email', 'voice', 'sms']).optional(),
+  has_draft: z.enum(['true', 'false']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   sort: z.enum(['received_at', 'updated_at', 'urgency_level', 'status', 'intent']).default('received_at'),
