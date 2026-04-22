@@ -45,9 +45,18 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * Cal.com /v2/slots can return two shapes inside each date bucket depending
+ * on API version + event type config:
+ *   - "2024-09-04"+: array of objects { start: ISO, attendeesCount?: number }
+ *   - older: array of plain ISO strings
+ * Our parser accepts both.
+ */
+type CalcomSlotEntry = string | { start?: string; time?: string; attendeesCount?: number };
+
 interface CalcomSlotsResponse {
   status: string;
-  data: Record<string, string[]>;
+  data: Record<string, CalcomSlotEntry[]>;
 }
 
 /**
@@ -140,8 +149,18 @@ export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<Slo
 }
 
 /** Flatten the date-keyed slot response into a chronological list of SlotOptions */
+/** Extract the ISO timestamp from either Cal.com slot shape. */
+function extractSlotIso(entry: CalcomSlotEntry): string | null {
+  if (typeof entry === 'string') return entry;
+  if (entry && typeof entry === 'object') {
+    if (typeof entry.start === 'string') return entry.start;
+    if (typeof entry.time === 'string') return entry.time;
+  }
+  return null;
+}
+
 function flattenAndFormat(
-  data: Record<string, string[]>,
+  data: Record<string, CalcomSlotEntry[]>,
   calcomUrl: string,
   timezone: string,
 ): SlotOption[] {
@@ -168,7 +187,9 @@ function flattenAndFormat(
   );
 
   for (const date of dates) {
-    for (const iso of data[date]) {
+    for (const entry of data[date]) {
+      const iso = extractSlotIso(entry);
+      if (!iso) continue;
       const d = new Date(iso);
       if (isNaN(d.getTime())) continue;
 
