@@ -52,11 +52,11 @@ describe('fetchAvailableSlots', () => {
   it('fetches and formats slots', async () => {
     global.fetch = vi.fn().mockResolvedValue(
       mockCalcomResponse({
-        '2026-04-17': [
-          '2026-04-17T09:00:00.000-05:00',
-          '2026-04-17T14:00:00.000-05:00',
+        '2099-04-17': [
+          '2099-04-17T09:00:00.000-05:00',
+          '2099-04-17T14:00:00.000-05:00',
         ],
-        '2026-04-18': ['2026-04-18T10:00:00.000-05:00'],
+        '2099-04-18': ['2099-04-18T10:00:00.000-05:00'],
       }),
     );
 
@@ -70,23 +70,23 @@ describe('fetchAvailableSlots', () => {
     });
 
     expect(slots).toHaveLength(3);
-    expect(slots[0].iso).toBe('2026-04-17T09:00:00.000-05:00');
+    expect(slots[0].iso).toBe('2099-04-17T09:00:00.000-05:00');
     expect(slots[0].date_display).toMatch(/Fri, Apr 17/);
     expect(slots[0].time_display).toMatch(/9:00\s*AM/i);
     expect(slots[0].booking_url).toContain('https://cal.com/me/service');
-    expect(slots[0].booking_url).toContain('date=2026-04-17');
+    expect(slots[0].booking_url).toContain('date=2099-04-17');
     expect(slots[0].booking_url).toContain('slot=');
   });
 
   it('respects maxSlots limit', async () => {
     global.fetch = vi.fn().mockResolvedValue(
       mockCalcomResponse({
-        '2026-04-17': [
-          '2026-04-17T09:00:00.000-05:00',
-          '2026-04-17T10:00:00.000-05:00',
-          '2026-04-17T11:00:00.000-05:00',
-          '2026-04-17T14:00:00.000-05:00',
-          '2026-04-17T15:00:00.000-05:00',
+        '2099-04-17': [
+          '2099-04-17T09:00:00.000-05:00',
+          '2099-04-17T10:00:00.000-05:00',
+          '2099-04-17T11:00:00.000-05:00',
+          '2099-04-17T14:00:00.000-05:00',
+          '2099-04-17T15:00:00.000-05:00',
         ],
       }),
     );
@@ -153,10 +153,101 @@ describe('fetchAvailableSlots', () => {
     expect(headers['cal-api-version']).toBe('2024-09-04');
   });
 
+  it('computes start/end dates in the business timezone (not UTC)', async () => {
+    // Regression test for the "today's slots skipped after 7pm Central" bug.
+    // Pin clock to 11pm Central Time on 2099-07-15, which is 04:00 UTC on
+    // 2099-07-16. Previous code would ask Cal.com for slots starting
+    // 2099-07-16, missing today's remaining hours. Fix: ask for 2099-07-15.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-07-16T04:00:00.000Z'));
+
+    const fetchMock = vi.fn().mockResolvedValue(mockCalcomResponse({}));
+    global.fetch = fetchMock;
+
+    try {
+      await fetchAvailableSlots({
+        apiKey: 'cal_test',
+        eventTypeId: 42,
+        calcomUrl: 'https://cal.com/me/x',
+        timezone: 'America/Chicago',
+        daysAhead: 7,
+        maxSlots: 3,
+      });
+
+      const url = new URL(fetchMock.mock.calls[0][0] as string);
+      expect(url.searchParams.get('start')).toBe('2099-07-15');
+      expect(url.searchParams.get('timeZone')).toBe('America/Chicago');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops slots that have already passed', async () => {
+    // Pin clock so 9am local is "in the past" and 3pm is still future
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-07-15T17:00:00.000Z')); // noon Central
+
+    global.fetch = vi.fn().mockResolvedValue(
+      mockCalcomResponse({
+        '2099-07-15': [
+          '2099-07-15T09:00:00.000-05:00', // passed (9am CT = 14:00 UTC, before noon CT)
+          '2099-07-15T15:00:00.000-05:00', // future (3pm CT)
+          '2099-07-15T17:00:00.000-05:00', // future (5pm CT)
+        ],
+      }),
+    );
+
+    try {
+      const slots = await fetchAvailableSlots({
+        apiKey: 'cal_test',
+        eventTypeId: 42,
+        calcomUrl: 'https://cal.com/me/x',
+        timezone: 'America/Chicago',
+        daysAhead: 7,
+        maxSlots: 5,
+      });
+
+      expect(slots).toHaveLength(2);
+      expect(slots.every((s) => new Date(s.iso).getTime() >= Date.now())).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops slots within the next 30 minutes (insufficient runway)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2099-07-15T17:00:00.000Z')); // noon Central
+
+    global.fetch = vi.fn().mockResolvedValue(
+      mockCalcomResponse({
+        '2099-07-15': [
+          '2099-07-15T12:15:00.000-05:00', // 15 min from now — too soon
+          '2099-07-15T13:00:00.000-05:00', // 1 hour from now — keep
+        ],
+      }),
+    );
+
+    try {
+      const slots = await fetchAvailableSlots({
+        apiKey: 'cal_test',
+        eventTypeId: 42,
+        calcomUrl: 'https://cal.com/me/x',
+        timezone: 'America/Chicago',
+        daysAhead: 1,
+        maxSlots: 5,
+      });
+
+      expect(slots).toHaveLength(1);
+      expect(slots[0].iso).toBe('2099-07-15T13:00:00.000-05:00');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('caches results within the TTL window', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       mockCalcomResponse({
-        '2026-04-17': ['2026-04-17T09:00:00.000-05:00'],
+        '2099-04-17': ['2099-04-17T09:00:00.000-05:00'],
       }),
     );
     global.fetch = fetchMock;

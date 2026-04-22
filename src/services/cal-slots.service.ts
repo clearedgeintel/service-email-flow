@@ -55,9 +55,13 @@ export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<Slo
 
   try {
     const now = new Date();
-    // Start slightly in the future to avoid slots already passed
-    const start = new Date(now.getTime() + 30 * 60 * 1000).toISOString().split('T')[0];
-    const end = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Compute start/end dates in the business timezone. Previously we used
+    // UTC dates via toISOString().split('T'), which rolled to "tomorrow"
+    // during late-evening Central Time and made today's remaining slots
+    // invisible. Cal.com interprets YYYY-MM-DD in the provided timeZone.
+    const start = formatDateInTimezone(now, timezone);
+    const endDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+    const end = formatDateInTimezone(endDate, timezone);
 
     const url = new URL(`${CALCOM_API_BASE}/slots`);
     url.searchParams.set('eventTypeId', String(eventTypeId));
@@ -91,7 +95,17 @@ export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<Slo
       return [];
     }
 
-    const slots = flattenAndFormat(body.data, calcomUrl, timezone);
+    // Filter out slots that have already passed or are within the next
+    // 30 minutes (not enough runway for a tech to prep). This replaces the
+    // old "add 30 min to start date" buffer which never worked because the
+    // start param is a date, not a time.
+    const cutoff = Date.now() + 30 * 60 * 1000;
+    const allSlots = flattenAndFormat(body.data, calcomUrl, timezone);
+    const slots = allSlots.filter((s) => {
+      const t = new Date(s.iso).getTime();
+      return !isNaN(t) && t >= cutoff;
+    });
+
     cache.set(cacheKey, { slots, expiresAt: Date.now() + CACHE_TTL_MS });
 
     return slots.slice(0, maxSlots);
@@ -139,6 +153,23 @@ function flattenAndFormat(
   }
 
   return slots;
+}
+
+/**
+ * Format a Date as YYYY-MM-DD in the given IANA timezone. Cal.com's /slots
+ * start/end params are interpreted in the provided timeZone — if we pass a
+ * UTC date that's already rolled to tomorrow locally, today's slots get
+ * skipped entirely.
+ */
+function formatDateInTimezone(d: Date, timezone: string): string {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  // en-CA locale produces YYYY-MM-DD directly
+  return fmt.format(d);
 }
 
 /** Build a pre-filled Cal.com URL that auto-selects the given slot */
