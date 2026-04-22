@@ -410,6 +410,65 @@ describe('fetchAvailableSlots', () => {
     }
   });
 
+  it('parses Cal.com v2 object shape { start: ISO }', async () => {
+    // Regression: Cal.com /v2/slots returns arrays of { start: ISO } objects,
+    // not plain strings. Earlier parser silently dropped all of them.
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'success',
+        data: {
+          '2099-04-17': [
+            { start: '2099-04-17T09:00:00.000-05:00' },
+            { start: '2099-04-17T09:30:00.000-05:00', attendeesCount: 0 },
+          ],
+          '2099-04-18': [{ start: '2099-04-18T10:00:00.000-05:00' }],
+        },
+      }),
+    } as unknown as Response);
+
+    const slots = await fetchAvailableSlots({
+      apiKey: 'cal_test',
+      eventTypeId: 42,
+      calcomUrl: 'https://cal.com/me/x',
+      timezone: 'America/Chicago',
+      daysAhead: 7,
+      maxSlots: 5,
+      minLeadMinutes: 0,
+    });
+
+    expect(slots).toHaveLength(3);
+    expect(slots[0].iso).toBe('2099-04-17T09:00:00.000-05:00');
+    expect(slots[2].iso).toBe('2099-04-18T10:00:00.000-05:00');
+  });
+
+  it('still parses legacy Cal.com string-array shape', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'success',
+        data: {
+          '2099-04-17': ['2099-04-17T09:00:00.000-05:00'],
+        },
+      }),
+    } as unknown as Response);
+
+    const slots = await fetchAvailableSlots({
+      apiKey: 'cal_test',
+      eventTypeId: 42,
+      calcomUrl: 'https://cal.com/me/x',
+      timezone: 'America/Chicago',
+      daysAhead: 7,
+      maxSlots: 5,
+      minLeadMinutes: 0,
+    });
+
+    expect(slots).toHaveLength(1);
+    expect(slots[0].iso).toBe('2099-04-17T09:00:00.000-05:00');
+  });
+
   it('bypassCache: true forces a fresh fetch even with cached result', async () => {
     // First call: Cal.com returns empty. Gets cached.
     // Second call with bypassCache: Cal.com returns real slots. Should be
