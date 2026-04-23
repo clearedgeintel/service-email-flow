@@ -361,11 +361,13 @@ Core workflow that predates this roadmap:
 - [ ] Sidebar nav entry: "Calendar" between Calls and Analytics
 - [ ] Date range toggle (today / week / month); timezone respects `business_timezone` setting
 
-### 11.2 Google Calendar Adapter (read-only)
-- [ ] OAuth scope piggybacks on existing Gmail auth (add `calendar.readonly`)
-- [ ] Google adapter: `listEvents` only (no slot booking), returns admin's personal busy blocks
-- [ ] Calendar view overlays Google events as read-only "Busy (personal)" blocks so ClearDesk appointments don't conflict with your own calendar
-- [ ] Settings → Calendar: per-provider enable toggles
+### 11.2 Google Calendar Adapter (read-only) — COMPLETE
+- [x] Reuses Gmail's Google Cloud project (same `GMAIL_CLIENT_ID`/`SECRET`) with a separate `GOOGLE_CALENDAR_REFRESH_TOKEN` minted for `calendar.readonly` scope
+- [x] `google.provider.ts` implements `listEvents` only (read-only). Filters cancelled, transparent ("Available"), and self-declined events. Expands recurring events via `singleEvents: true`. Paginates up to 1000 items.
+- [x] Calendar view overlays Google events as yellow blocks with clickable `htmlLink` to open in Google Calendar. Admin-toggleable privacy setting renders as "Busy" vs real event titles (default: real titles per business need).
+- [x] Configurable `google_calendar_id` setting — defaults to `primary`, can point at a shared team calendar.
+- [x] Settings UI: enable toggle + "Show real titles" privacy toggle + Calendar ID field.
+- [x] Migration 020 + `docs/GOOGLE_CALENDAR_SETUP.md` (OAuth Playground steps, troubleshooting).
 
 ### 11.3 Calendly Adapter
 - [ ] Calendly v2 API integration (PAT-based auth)
@@ -396,4 +398,4 @@ Core workflow that predates this roadmap:
 | 8 | Feature Enhancements | P2 | **8.1 COMPLETE**, **8.2 COMPLETE** (customer portal), 8.3 multi-tenant (deferred), **8.4 COMPLETE** (smart scheduling), **8.5 COMPLETE** (Cal.com + webhooks) |
 | 9 | Documentation & DevEx | P3 | API spec, runbooks, dev tooling |
 | 10 | Multi-Channel (Voice + n8n + SMS + UX) | P2 | **10.1–10.5 COMPLETE** — Retell voice (in/out), n8n callback + templates, Twilio SMS + auto-reply, voice analytics, unified timeline + search + dark mode. 10.6 combined scenarios deferred |
-| 11 | Calendar Integration (provider-agnostic) | P2 | Adapter interface + Cal.com (in progress), then Google (read-only overlay), then Calendly |
+| 11 | Calendar Integration (provider-agnostic) | P2 | **11.1 + 11.2 COMPLETE** — Cal.com read/write + Google Calendar read-only overlay. 11.3 Calendly pending. |

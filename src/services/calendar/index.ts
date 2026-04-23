@@ -1,11 +1,13 @@
 import { CalendarEvent, CalendarProvider, FreeSlot, ProviderId } from './types';
 import { clearDeskProvider } from './cleardesk.provider';
 import { calComProvider } from './calcom.provider';
+import { googleCalendarProvider } from './google.provider';
 
-/** All known providers. Additional ones (Google, Calendly) get added here. */
+/** All known providers. Additional ones (e.g. Calendly) get added here. */
 const ALL_PROVIDERS: CalendarProvider[] = [
   clearDeskProvider,
   calComProvider,
+  googleCalendarProvider,
 ];
 
 /** Providers whose credentials are present and which are enabled. */
