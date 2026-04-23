@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { status, intent, urgency, trade, from, to, search, channel, has_draft, page, limit, sort, order } = parsed.data;
+  const { status, intent, urgency, trade, from, to, search, channel, has_draft, has_booking, page, limit, sort, order } = parsed.data;
 
   const supabase = getSupabase();
 
@@ -131,6 +131,8 @@ export async function GET(request: NextRequest) {
   if (to) query = query.lte('received_at', to);
   if (has_draft === 'true') query = query.not('draft_reply', 'is', null);
   if (has_draft === 'false') query = query.is('draft_reply', null);
+  if (has_booking === 'true') query = query.not('booking_id', 'is', null);
+  if (has_booking === 'false') query = query.is('booking_id', null);
 
   const offset = (page - 1) * limit;
   query = query.order(sort, { ascending: order === 'asc' }).range(offset, offset + limit - 1);

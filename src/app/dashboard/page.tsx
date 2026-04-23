@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { StatusBadge, UrgencyBadge, IntentBadge } from '@/components/status-badge';
-import { Search, RefreshCw, ChevronLeft, ChevronRight, Filter, Download, Bookmark, X as CloseIcon, AlertTriangle, X as XIcon, Activity, Mail, PhoneCall, MessageCircle, MessageSquare } from 'lucide-react';
+import { Search, RefreshCw, ChevronLeft, ChevronRight, Filter, Download, Bookmark, X as CloseIcon, AlertTriangle, X as XIcon, Activity, Mail, PhoneCall, MessageCircle, MessageSquare, CalendarCheck } from 'lucide-react';
 
 interface CaseRow {
   id: number;
@@ -20,6 +20,9 @@ interface CaseRow {
   customer_reply_sent: boolean;
   tech_notified: boolean;
   draft_reply: { type?: 'reply' | 'followup' } | null;
+  booking_id: string | null;
+  booking_start_at: string | null;
+  booking_status: string | null;
 }
 
 function ChannelIcon({ gmailId }: { gmailId: string }) {
@@ -86,6 +89,7 @@ function CaseQueueContent() {
   const search = searchParams.get('search') || '';
   const channel = searchParams.get('channel') || '';
   const hasDraft = searchParams.get('has_draft') || '';
+  const hasBooking = searchParams.get('has_booking') || '';
 
   // Load saved filters from localStorage
   useEffect(() => {
@@ -108,6 +112,7 @@ function CaseQueueContent() {
     if (search) params.set('search', search);
     if (channel) params.set('channel', channel);
     if (hasDraft) params.set('has_draft', hasDraft);
+    if (hasBooking) params.set('has_booking', hasBooking);
 
     try {
       const res = await fetch(`/api/cases?${params}`);
@@ -133,7 +138,7 @@ function CaseQueueContent() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, status, intent, urgency, search, channel, hasDraft, router]);
+  }, [page, status, intent, urgency, search, channel, hasDraft, hasBooking, router]);
 
   useEffect(() => {
     fetchCases();
@@ -205,6 +210,7 @@ function CaseQueueContent() {
     if (search) params.set('search', search);
     if (channel) params.set('channel', channel);
     if (hasDraft) params.set('has_draft', hasDraft);
+    if (hasBooking) params.set('has_booking', hasBooking);
     window.location.href = `/api/cases/export?${params}`;
   };
 
@@ -265,6 +271,7 @@ function CaseQueueContent() {
     if (search) current.search = search;
     if (channel) current.channel = channel;
     if (hasDraft) current.has_draft = hasDraft;
+    if (hasBooking) current.has_booking = hasBooking;
 
     const updated = [...savedFilters, { name: newFilterName.trim(), params: current }];
     setSavedFilters(updated);
@@ -494,6 +501,19 @@ function CaseQueueContent() {
                 <MessageSquare className="w-3 h-3" />
                 Pending drafts
               </button>
+
+              <button
+                onClick={() => updateFilter('has_booking', hasBooking === 'true' ? '' : 'true')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border transition-colors ${
+                  hasBooking === 'true'
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+                title="Show only cases where the customer has booked an appointment"
+              >
+                <CalendarCheck className="w-3 h-3" />
+                Booked
+              </button>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -668,6 +688,29 @@ function CaseQueueContent() {
                             aria-label={c.draft_reply.type === 'followup' ? 'Follow-up draft pending' : 'Draft reply pending'}
                           />
                         )}
+                        {c.booking_id && (
+                          <span
+                            title={
+                              c.booking_start_at
+                                ? `${c.booking_status || 'booked'} — ${new Date(c.booking_start_at).toLocaleString()}`
+                                : c.booking_status || 'booked'
+                            }
+                            className="inline-flex"
+                          >
+                            <CalendarCheck
+                              className={`w-3.5 h-3.5 ${
+                                c.booking_status === 'cancelled' ? 'text-red-500' :
+                                c.booking_status === 'completed' ? 'text-gray-400' :
+                                'text-emerald-600'
+                              }`}
+                              aria-label={
+                                c.booking_status === 'cancelled' ? 'Booking cancelled' :
+                                c.booking_status === 'completed' ? 'Booking completed' :
+                                'Appointment booked'
+                              }
+                            />
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 cursor-pointer" onClick={() => router.push(`/dashboard/cases/${c.id}`)}>
@@ -730,6 +773,16 @@ function CaseQueueContent() {
                   <span className="flex items-center gap-1 text-xs text-gray-400 ml-2 whitespace-nowrap">
                     <ChannelIcon gmailId={c.gmail_message_id} />
                     {c.draft_reply && <MessageSquare className="w-3 h-3 text-amber-500" aria-label="Draft pending" />}
+                    {c.booking_id && (
+                      <CalendarCheck
+                        className={`w-3 h-3 ${
+                          c.booking_status === 'cancelled' ? 'text-red-500' :
+                          c.booking_status === 'completed' ? 'text-gray-400' :
+                          'text-emerald-600'
+                        }`}
+                        aria-label="Appointment booked"
+                      />
+                    )}
                     #{c.id}
                   </span>
                 </div>
@@ -738,6 +791,18 @@ function CaseQueueContent() {
                   {c.intent && <IntentBadge intent={c.intent} />}
                   {c.urgency_level && <UrgencyBadge urgency={c.urgency_level} />}
                 </div>
+                {c.booking_id && c.booking_start_at && (
+                  <p className={`text-xs mt-2 flex items-center gap-1 ${
+                    c.booking_status === 'cancelled' ? 'text-red-600' :
+                    c.booking_status === 'completed' ? 'text-gray-500' :
+                    'text-emerald-700 dark:text-emerald-400'
+                  }`}>
+                    <CalendarCheck className="w-3.5 h-3.5" />
+                    {c.booking_status === 'cancelled' ? 'Cancelled' :
+                     c.booking_status === 'completed' ? 'Completed' :
+                     'Booked'} — {new Date(c.booking_start_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
                 <p className="text-xs text-gray-400 mt-2">
                   {new Date(c.received_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </p>
