@@ -40,6 +40,8 @@ interface BookingData {
   attendeeEmail: string;
   cancellationReason?: string;
   bookingUrl?: string;
+  /** ClearDesk case ID parsed from Cal.com metadata.cleardesk_case_id, if set */
+  clearDeskCaseId?: number;
 }
 
 /** Extract normalized booking data from a Cal.com webhook payload */
@@ -59,13 +61,25 @@ function extractBookingData(webhook: CalcomWebhookPayload): BookingData | null {
 
   if (!attendeeEmail) return null;
 
+  // Parse ClearDesk case ID out of Cal.com metadata if it was embedded in
+  // the booking URL as metadata[cleardesk_case_id]=<id>. This is the
+  // authoritative case-match signal when present.
+  const metadata = data.metadata as Record<string, unknown> | undefined;
+  const rawCaseId = metadata?.cleardesk_case_id;
+  const clearDeskCaseId = typeof rawCaseId === 'number'
+    ? rawCaseId
+    : typeof rawCaseId === 'string'
+      ? parseInt(rawCaseId, 10)
+      : undefined;
+
   return {
     uid,
     startTime,
     endTime: endTime || startTime,
     attendeeEmail,
     cancellationReason: data.cancellationReason as string | undefined,
-    bookingUrl: (data.metadata as Record<string, unknown> | undefined)?.videoCallUrl as string | undefined,
+    bookingUrl: metadata?.videoCallUrl as string | undefined,
+    clearDeskCaseId: clearDeskCaseId && !isNaN(clearDeskCaseId) ? clearDeskCaseId : undefined,
   };
 }
 
@@ -99,25 +113,64 @@ export async function processCalcomWebhook(webhook: CalcomWebhookPayload): Promi
 
   const supabase = getSupabase();
 
-  // Try to find existing case by booking_id first, then fall back to email lookup
+  // Case-match priority:
+  // 1. metadata.cleardesk_case_id embedded in the booking URL — authoritative
+  // 2. existing case where booking_id matches (handles reschedule / cancel)
+  // 3. most recent open case for the attendee email — legacy fallback
+  //
+  // The email fallback is unreliable when multiple open cases share a
+  // customer email (common in testing, and for repeat customers in prod),
+  // so metadata-based matching is strongly preferred. Any URL we generate
+  // after PR #19 carries the metadata.
   let caseId: number | null = null;
+  let matchedBy: 'metadata' | 'booking_id' | 'email' | 'none' = 'none';
 
-  const { data: existing } = await supabase
-    .from('email_cases')
-    .select('id')
-    .eq('booking_id', booking.uid)
-    .maybeSingle();
+  if (booking.clearDeskCaseId) {
+    const { data: metaCase } = await supabase
+      .from('email_cases')
+      .select('id')
+      .eq('id', booking.clearDeskCaseId)
+      .maybeSingle();
+    if (metaCase) {
+      caseId = (metaCase as { id: number }).id;
+      matchedBy = 'metadata';
+    } else {
+      log.warn(
+        { metadata_case_id: booking.clearDeskCaseId, uid: booking.uid },
+        'Booking metadata pointed at a case that does not exist; falling back to email match',
+      );
+    }
+  }
 
-  if (existing) {
-    caseId = (existing as { id: number }).id;
-  } else {
+  if (!caseId) {
+    const { data: existing } = await supabase
+      .from('email_cases')
+      .select('id')
+      .eq('booking_id', booking.uid)
+      .maybeSingle();
+    if (existing) {
+      caseId = (existing as { id: number }).id;
+      matchedBy = 'booking_id';
+    }
+  }
+
+  if (!caseId) {
     caseId = await findCaseForBooking(booking.attendeeEmail);
+    if (caseId) {
+      matchedBy = 'email';
+      log.info(
+        { caseId, email: booking.attendeeEmail, uid: booking.uid },
+        'Matched booking by email only (legacy) — consider re-sending replies for cleaner metadata attribution',
+      );
+    }
   }
 
   if (!caseId) {
     log.warn({ email: booking.attendeeEmail, uid: booking.uid }, 'No matching case for booking');
     return { handled: false, caseId: null, reason: 'No matching case found' };
   }
+
+  log.info({ caseId, matchedBy, uid: booking.uid }, 'Booking matched to case');
 
   // Determine new state based on event type
   const updates: Record<string, unknown> = {
