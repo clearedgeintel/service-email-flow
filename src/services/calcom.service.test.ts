@@ -159,6 +159,81 @@ describe('processCalcomWebhook', () => {
     expect(result.caseId).toBe(10);
   });
 
+  it('matches by metadata.cleardesk_case_id when present (authoritative)', async () => {
+    // Even though email lookup would pick a different case, metadata wins.
+    const mockSb = createMockSupabase();
+
+    // 1) metadata-based lookup → case 70 exists
+    mockSb.from.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: { id: 70 }, error: null }),
+        }),
+      }),
+    });
+    // 2) update case 70
+    mockSb.from.mockReturnValueOnce({
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    });
+    mockedGetSupabase.mockReturnValue(mockSb as any);
+
+    const webhook = buildWebhook('BOOKING_CREATED', {
+      metadata: { cleardesk_case_id: '70' },
+    });
+    const result = await processCalcomWebhook(webhook as any);
+    expect(result.handled).toBe(true);
+    expect(result.caseId).toBe(70);
+  });
+
+  it('falls back to email match when metadata case_id points at a non-existent case', async () => {
+    const mockSb = createMockSupabase();
+
+    // 1) metadata lookup → case 999 doesn't exist
+    mockSb.from.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
+    });
+    // 2) booking_id lookup → no match
+    mockSb.from.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
+    });
+    // 3) email fallback → case 42
+    mockSb.from.mockReturnValueOnce({
+      select: vi.fn().mockReturnValue({
+        or: vi.fn().mockReturnValue({
+          not: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [{ id: 42 }], error: null }),
+            }),
+          }),
+        }),
+      }),
+    });
+    // 4) update
+    mockSb.from.mockReturnValueOnce({
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    });
+    mockedGetSupabase.mockReturnValue(mockSb as any);
+
+    const webhook = buildWebhook('BOOKING_CREATED', {
+      metadata: { cleardesk_case_id: '999' },
+    });
+    const result = await processCalcomWebhook(webhook as any);
+    expect(result.handled).toBe(true);
+    expect(result.caseId).toBe(42);
+  });
+
   it('returns unhandled for unknown event types', async () => {
     const mockSb = createMockSupabase();
     mockSb.from.mockReturnValueOnce({

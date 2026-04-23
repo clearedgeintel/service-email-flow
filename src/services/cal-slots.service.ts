@@ -21,6 +21,12 @@ interface FetchSlotsParams {
   daysAhead: number;
   maxSlots: number;
   /**
+   * Embeds into the generated booking URL as Cal.com metadata so the
+   * webhook can match the resulting booking back to this exact case —
+   * critical when multiple open cases share a customer email.
+   */
+  caseId?: number;
+  /**
    * Minimum lead time in minutes — slots closer than this to "now" get
    * filtered out as insufficient runway. Defaults to 30. Set to 0 to
    * offer the literal next-available slot (handy for demo/test).
@@ -64,7 +70,7 @@ interface CalcomSlotsResponse {
  * Returns [] on any failure (graceful degradation to generic booking link).
  */
 export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<SlotOption[]> {
-  const { apiKey, eventTypeId, calcomUrl, timezone, daysAhead, maxSlots, bypassCache } = params;
+  const { apiKey, eventTypeId, calcomUrl, timezone, daysAhead, maxSlots, bypassCache, caseId } = params;
   const minLeadMinutes = typeof params.minLeadMinutes === 'number' ? params.minLeadMinutes : 30;
 
   if (!apiKey || !eventTypeId || eventTypeId <= 0) {
@@ -75,7 +81,13 @@ export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<Slo
   if (!bypassCache) {
     const cached = cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
-      return cached.slots.slice(0, maxSlots);
+      // Re-apply per-caller caseId to the cached URLs. Cache stores URLs
+      // WITHOUT caseId metadata so two different cases sharing the same
+      // eventTypeId don't leak each other's booking URLs.
+      return cached.slots.slice(0, maxSlots).map((s) => ({
+        ...s,
+        booking_url: caseId ? appendCaseMetadata(s.booking_url, caseId) : s.booking_url,
+      }));
     }
   } else {
     // Drop any stale entry so a concurrent non-bypass call gets the fresh
@@ -140,7 +152,12 @@ export async function fetchAvailableSlots(params: FetchSlotsParams): Promise<Slo
 
     cache.set(cacheKey, { slots, expiresAt: Date.now() + CACHE_TTL_MS });
 
-    return slots.slice(0, maxSlots);
+    // Apply per-caller caseId to URLs on the way out. The cached copy stays
+    // clean so subsequent callers with a different caseId get their own.
+    return slots.slice(0, maxSlots).map((s) => ({
+      ...s,
+      booking_url: caseId ? appendCaseMetadata(s.booking_url, caseId) : s.booking_url,
+    }));
   } catch (err) {
     const isAbort = err instanceof Error && err.name === 'AbortError';
     log.warn({ err: isAbort ? 'timeout' : err, eventTypeId }, 'Failed to fetch Cal.com slots');
@@ -238,6 +255,22 @@ function buildBookingUrl(baseUrl: string, iso: string): string {
   url.searchParams.set('month', monthPart);
   url.searchParams.set('slot', iso);
   return url.toString();
+}
+
+/**
+ * Append Cal.com metadata[cleardesk_case_id]=<id> so the webhook payload
+ * carries the case reference back. Lets us match a BOOKING_CREATED event
+ * to the exact originating case even when multiple open cases share the
+ * customer email.
+ */
+function appendCaseMetadata(bookingUrl: string, caseId: number): string {
+  try {
+    const url = new URL(bookingUrl);
+    url.searchParams.set('metadata[cleardesk_case_id]', String(caseId));
+    return url.toString();
+  } catch {
+    return bookingUrl;
+  }
 }
 
 /** Clear the slot cache (for testing or manual invalidation) */

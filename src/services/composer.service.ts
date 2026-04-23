@@ -330,6 +330,7 @@ async function fetchSlotsForCase(
     maxSlots: Math.min(Math.max(maxSlots, 1), 5),
     minLeadMinutes: leadMin,
     bypassCache,
+    caseId,
   });
 
   if (slots.length === 0) {

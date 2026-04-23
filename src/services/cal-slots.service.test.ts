@@ -443,6 +443,60 @@ describe('fetchAvailableSlots', () => {
     expect(slots[2].iso).toBe('2099-04-18T10:00:00.000-05:00');
   });
 
+  it('embeds caseId as Cal.com metadata in booking URLs', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'success',
+        data: { '2099-04-17': [{ start: '2099-04-17T09:00:00.000-05:00' }] },
+      }),
+    } as unknown as Response);
+
+    const slots = await fetchAvailableSlots({
+      apiKey: 'cal_test',
+      eventTypeId: 42,
+      calcomUrl: 'https://cal.com/me/service',
+      timezone: 'America/Chicago',
+      daysAhead: 7,
+      maxSlots: 1,
+      minLeadMinutes: 0,
+      caseId: 70,
+    });
+
+    expect(slots[0].booking_url).toContain('metadata%5Bcleardesk_case_id%5D=70');
+  });
+
+  it('caseId on cached result overrides the URL each call', async () => {
+    // First call caches slots for case 68; second call for case 70 should
+    // get URLs tagged with 70, not 68.
+    global.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'success',
+        data: { '2099-04-17': [{ start: '2099-04-17T09:00:00.000-05:00' }] },
+      }),
+    } as unknown as Response);
+
+    const params = {
+      apiKey: 'cal_test',
+      eventTypeId: 42,
+      calcomUrl: 'https://cal.com/me/service',
+      timezone: 'America/Chicago',
+      daysAhead: 7,
+      maxSlots: 1,
+      minLeadMinutes: 0,
+    };
+
+    const first = await fetchAvailableSlots({ ...params, caseId: 68 });
+    const second = await fetchAvailableSlots({ ...params, caseId: 70 });
+
+    expect(first[0].booking_url).toContain('metadata%5Bcleardesk_case_id%5D=68');
+    expect(second[0].booking_url).toContain('metadata%5Bcleardesk_case_id%5D=70');
+    expect(second[0].booking_url).not.toContain('=68');
+  });
+
   it('still parses legacy Cal.com string-array shape', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
