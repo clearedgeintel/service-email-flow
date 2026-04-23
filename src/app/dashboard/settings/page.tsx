@@ -91,6 +91,12 @@ const SETTING_GROUPS = [
       { key: 'business_hours_weekdays', label: 'Open days (ISO 1=Mon..7=Sun, e.g. [1,2,3,4,5])', type: 'text' },
     ],
   },
+  {
+    title: 'Google Calendar (read-only)',
+    fields: [
+      { key: 'google_calendar_id', label: 'Calendar ID (default: primary)', type: 'text' },
+    ],
+  },
 ];
 
 export default function SettingsPage() {
@@ -805,6 +811,42 @@ export default function SettingsPage() {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.business_hours_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.business_hours_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Google Calendar overlay</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {settings.google_calendar_enabled === 'true'
+                    ? 'Personal busy blocks from Google Calendar appear as yellow events on the /dashboard/calendar view alongside ClearDesk + Cal.com. Requires GOOGLE_CALENDAR_REFRESH_TOKEN env var.'
+                    : 'Disabled — Google events are not fetched. Enable after setting GOOGLE_CALENDAR_REFRESH_TOKEN (see docs/GOOGLE_CALENDAR_SETUP.md).'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, google_calendar_enabled: settings.google_calendar_enabled === 'true' ? 'false' : 'true' })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.google_calendar_enabled === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.google_calendar_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Show real Google event titles</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {settings.google_calendar_show_titles === 'true'
+                    ? 'Event summaries (e.g. "Dentist appointment") render on the calendar view — useful but surfaces personal details.'
+                    : 'Every Google event displays as "Busy" — keeps personal event names out of the ClearDesk UI.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, google_calendar_show_titles: settings.google_calendar_show_titles === 'true' ? 'false' : 'true' })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ml-4 ${settings.google_calendar_show_titles === 'true' ? 'bg-[#185FA5]' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${settings.google_calendar_show_titles === 'true' ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
           </div>
