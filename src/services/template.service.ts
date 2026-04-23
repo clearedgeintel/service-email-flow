@@ -206,11 +206,24 @@ export async function seedDefaultTemplates(): Promise<{ inserted: number; skippe
   const supabase = getSupabase();
 
   // Fetch existing keys so we only insert the ones that are missing
-  const { data: existing } = await supabase
+  const { data: existing, error: selectError } = await supabase
     .from('email_templates')
     .select('key');
-  const existingKeys = new Set(((existing || []) as Array<{ key: string }>).map((r) => r.key));
 
+  // If the table itself doesn't exist yet (migration 010 never ran), give
+  // a targeted error — the seed button can INSERT rows but not run DDL,
+  // so it can't fix this by itself.
+  if (selectError) {
+    if (isMissingTableError(selectError)) {
+      throw new Error(
+        'The email_templates table does not exist yet. Run migration 010 in Supabase (SQL Editor → paste supabase/migrations/010_email_templates.sql → Run), then reload schema cache under Settings → API.',
+      );
+    }
+    log.error({ error: selectError }, 'Failed to read email_templates');
+    throw new Error(selectError.message);
+  }
+
+  const existingKeys = new Set(((existing || []) as Array<{ key: string }>).map((r) => r.key));
   const missing = DEFAULT_TEMPLATES.filter((t) => !existingKeys.has(t.key));
   if (missing.length === 0) {
     return { inserted: 0, skipped: DEFAULT_TEMPLATES.length };
@@ -218,6 +231,11 @@ export async function seedDefaultTemplates(): Promise<{ inserted: number; skippe
 
   const { error } = await supabase.from('email_templates').insert(missing);
   if (error) {
+    if (isMissingTableError(error)) {
+      throw new Error(
+        'The email_templates table does not exist yet. Run migration 010 in Supabase.',
+      );
+    }
     log.error({ error }, 'Failed to seed default templates');
     throw new Error(error.message);
   }
@@ -225,6 +243,25 @@ export async function seedDefaultTemplates(): Promise<{ inserted: number; skippe
   cache.clear();
   log.info({ inserted: missing.length }, 'Seeded default templates');
   return { inserted: missing.length, skipped: existingKeys.size };
+}
+
+/**
+ * Supabase/PostgREST returns a recognizable message + code pair when a
+ * queried table isn't in the schema cache. Detect it so we can give the
+ * admin actionable guidance instead of the raw error.
+ */
+function isMissingTableError(err: { message?: string; code?: string; details?: string }): boolean {
+  const msg = (err.message || '').toLowerCase();
+  const details = (err.details || '').toLowerCase();
+  // PGRST205 = "Could not find the table ... in the schema cache"
+  // 42P01    = Postgres "undefined_table"
+  return (
+    err.code === 'PGRST205' ||
+    err.code === '42P01' ||
+    msg.includes('schema cache') ||
+    msg.includes('relation') && msg.includes('does not exist') ||
+    details.includes('schema cache')
+  );
 }
 
 /**
