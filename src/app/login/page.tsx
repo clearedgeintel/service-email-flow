@@ -17,6 +17,7 @@ function BrandIcon({ className = 'w-12 h-12' }: { className?: string }) {
 }
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,10 +29,16 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // Empty email field → server falls back to the ADMIN_PASSWORD
+      // bootstrap (legacy single-admin path). Once a real user exists,
+      // future logins should fill in the email.
+      const body: Record<string, string> = { password };
+      if (email.trim()) body.email = email.trim();
+
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
@@ -70,8 +77,22 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="bg-white dark:bg-[#112240] rounded-xl shadow-xl border border-slate-200 dark:border-white/10 p-6 space-y-4">
           <div>
+            <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+              Email <span className="text-xs text-slate-400 font-normal">(blank for bootstrap)</span>
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2.5 border border-slate-300 dark:border-white/10 dark:bg-[#0B1A2E] dark:text-slate-100 rounded-lg text-sm focus:ring-2 focus:ring-[#185FA5] focus:border-[#185FA5] outline-none"
+              placeholder="you@company.com"
+              autoFocus
+            />
+          </div>
+          <div>
             <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
-              Admin Password
+              Password
             </label>
             <input
               id="password"
@@ -80,7 +101,6 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2.5 border border-slate-300 dark:border-white/10 dark:bg-[#0B1A2E] dark:text-slate-100 rounded-lg text-sm focus:ring-2 focus:ring-[#185FA5] focus:border-[#185FA5] outline-none"
               placeholder="Enter password"
-              autoFocus
             />
           </div>
 
