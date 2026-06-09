@@ -133,8 +133,15 @@ export async function POST(request: NextRequest) {
 
     return buildSessionCookieResponse(sessionId);
   } catch (err) {
-    log.error({ err }, 'login route error');
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    // Surface the real error message in both the response (so the admin
+    // sees it in the browser network tab) and the worker logs. Generic
+    // "Internal server error" makes bootstrap problems undebuggable.
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    log.error({ err, message }, 'login route error');
+    return NextResponse.json(
+      { error: `Login failed: ${message}` },
+      { status: 500 },
+    );
   }
 }
 
