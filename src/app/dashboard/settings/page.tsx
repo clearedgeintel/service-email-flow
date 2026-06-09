@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Save, Plus, Trash2, Check, Tag, RefreshCw, Key, Eye, EyeOff } from 'lucide-react';
+import { Save, Plus, Trash2, Check, Tag, RefreshCw, Key, Eye, EyeOff, Users } from 'lucide-react';
 
 interface PricingItem {
   id: number;
@@ -165,6 +165,75 @@ export default function SettingsPage() {
   const [n8nApiKey, setN8nApiKey] = useState<string | null>(null);
   const [n8nKeyRevealed, setN8nKeyRevealed] = useState(false);
   const [n8nKeyRotating, setN8nKeyRotating] = useState(false);
+
+  // --- Users (multi-tenant Phase 1 PR3) -----------------------------
+  interface UserRow {
+    id: string;
+    email: string;
+    name: string | null;
+    role: string;
+    last_login_at: string | null;
+    created_at: string;
+  }
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [newUser, setNewUser] = useState<{ email: string; name: string; password: string }>({
+    email: '', name: '', password: '',
+  });
+  const [userActionResult, setUserActionResult] = useState<string | null>(null);
+
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users || []);
+      } else if (res.status === 401) {
+        // Legacy admin_sessions cookie can't be resolved into a TenantContext;
+        // tell the admin to re-login so /api/users works.
+        setUserActionResult('Log out and log back in to manage users (session needs refresh).');
+      }
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  useEffect(() => { loadUsers(); }, []);
+
+  const createUser = async () => {
+    setUserActionResult(null);
+    const res = await fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: newUser.email.trim(),
+        password: newUser.password,
+        name: newUser.name.trim() || undefined,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok) {
+      setNewUser({ email: '', name: '', password: '' });
+      setUserActionResult(`Created ${data?.user?.email}`);
+      await loadUsers();
+    } else {
+      setUserActionResult(`Error: ${data?.error || 'unknown'}`);
+    }
+  };
+
+  const deleteUser = async (id: string, email: string) => {
+    if (!confirm(`Remove ${email}? This cannot be undone.`)) return;
+    setUserActionResult(null);
+    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setUserActionResult(`Removed ${email}`);
+      await loadUsers();
+    } else {
+      const data = await res.json().catch(() => null);
+      setUserActionResult(`Error: ${data?.error || 'failed'}`);
+    }
+  };
 
   const revealN8nKey = async () => {
     if (n8nApiKey) { setN8nKeyRevealed(true); return; }
@@ -913,6 +982,93 @@ export default function SettingsPage() {
                 Regenerate
               </button>
             </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Users</h2>
+              <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">{users.length} active</span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Admin users for this tenant. Anyone listed here can log in with email + password
+              and manage cases. Bootstrap admin from <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">ADMIN_PASSWORD</code> env
+              var still works during the transition.
+            </p>
+            {usersLoading ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500">Loading...</p>
+            ) : (
+              <>
+                {users.length > 0 && (
+                  <div className="space-y-1.5 mb-4">
+                    {users.map((u) => (
+                      <div key={u.id} className="flex items-center justify-between gap-3 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {u.email}
+                            {u.role === 'super_admin' && (
+                              <span className="ml-2 text-[10px] uppercase tracking-wide text-purple-600 dark:text-purple-400">super</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {u.name || '—'}
+                            {u.last_login_at && (
+                              <> · last login {new Date(u.last_login_at).toLocaleDateString()}</>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => deleteUser(u.id, u.email)}
+                          className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40 rounded"
+                          title="Remove user"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Add new user</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      type="email"
+                      value={newUser.email}
+                      onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                      placeholder="email@example.com"
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={newUser.name}
+                      onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                      placeholder="Name (optional)"
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm"
+                    />
+                    <input
+                      type="password"
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                      placeholder="Password (8+ chars)"
+                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 rounded-lg text-sm"
+                    />
+                  </div>
+                  <button
+                    onClick={createUser}
+                    disabled={!newUser.email || !newUser.password}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#185FA5] text-white rounded-lg text-sm hover:bg-[#0C447C] disabled:opacity-50"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add user
+                  </button>
+                  {userActionResult && (
+                    <p className={`text-xs ${userActionResult.startsWith('Error') ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
+                      {userActionResult}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <button
