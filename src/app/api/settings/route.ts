@@ -44,11 +44,22 @@ export async function PUT(request: NextRequest) {
   const supabase = getSupabase();
   const entries = Object.entries(parsed.data);
 
+  // Stamp tenant_id on each upsert. PK is still 'key' alone in Phase 1
+  // PR2, so the onConflict still matches by key; tenant_id ends up on
+  // every row for forward-compatibility with PR2B's composite PK move.
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+
   for (const [key, value] of entries) {
     await supabase
       .from('settings')
       .upsert(
-        { key, value: JSON.parse(JSON.stringify(value)), updated_at: new Date().toISOString() },
+        {
+          tenant_id: tenantId,
+          key,
+          value: JSON.parse(JSON.stringify(value)),
+          updated_at: new Date().toISOString(),
+        },
         { onConflict: 'key' },
       );
   }

@@ -38,9 +38,13 @@ export async function POST(request: NextRequest) {
   const { trade, service, keywords, price_min, price_max, unit } = parsed.data;
 
   const supabase = getSupabase();
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+
   const { data, error } = await supabase
     .from('pricing_items')
     .insert({
+      tenant_id: tenantId,
       trade,
       service,
       keywords: Array.isArray(keywords) ? keywords : [keywords],

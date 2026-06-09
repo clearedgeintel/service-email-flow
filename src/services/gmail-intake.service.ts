@@ -123,6 +123,12 @@ export async function deduplicateAndStore(emails: NormalizedEmail[]): Promise<nu
   const supabase = getSupabase();
   const insertedIds: number[] = [];
 
+  // Resolve tenant once for this batch. Phase 1 single-tenant → default
+  // tenant; Phase 2's per-tenant gmail-intake coordinator will pass the
+  // tenant id in via a param instead.
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+
   for (const email of emails) {
     // Check for duplicate
     const { data: existing } = await supabase
@@ -143,6 +149,7 @@ export async function deduplicateAndStore(emails: NormalizedEmail[]): Promise<nu
     const { data: inserted, error } = await supabase
       .from('email_cases')
       .insert({
+        tenant_id: tenantId,
         gmail_message_id: email.gmail_message_id,
         gmail_thread_id: email.gmail_thread_id,
         from_email: email.from_email,

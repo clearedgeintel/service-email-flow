@@ -19,6 +19,10 @@ vi.mock('@/lib/business-hours', () => ({
   describeBusinessHours: vi.fn(() => 'Mon-Fri 08:00-17:00 America/New_York'),
 }));
 
+vi.mock('@/lib/tenant', () => ({
+  getDefaultTenantId: vi.fn().mockResolvedValue('00000000-0000-0000-0000-00000000d3fa'),
+}));
+
 vi.mock('@/lib/logger', () => ({
   createChildLogger: () => ({
     info: vi.fn(),

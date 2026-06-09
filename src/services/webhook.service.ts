@@ -120,10 +120,11 @@ export async function deliverWebhook(
 ): Promise<{ success: boolean; status: number | null; error: string | null }> {
   const supabase = getSupabase();
 
-  // Fetch current subscription state (in case it was disabled after enqueueing)
+  // Fetch current subscription state (in case it was disabled after enqueueing).
+  // Also pull tenant_id so the delivery row inherits the same tenant.
   const { data: sub, error: fetchError } = await supabase
     .from('webhook_subscriptions')
-    .select('id, url, secret, active')
+    .select('id, url, secret, active, tenant_id')
     .eq('id', subscriptionId)
     .single();
 
@@ -131,7 +132,7 @@ export async function deliverWebhook(
     return { success: false, status: null, error: 'Subscription not found' };
   }
 
-  const subscription = sub as { id: number; url: string; secret: string; active: boolean };
+  const subscription = sub as { id: number; url: string; secret: string; active: boolean; tenant_id: string | null };
 
   if (!subscription.active) {
     // Subscription disabled while job was queued — skip silently
@@ -141,10 +142,12 @@ export async function deliverWebhook(
   const rawBody = JSON.stringify(payload);
   const signature = signPayload(rawBody, subscription.secret);
 
-  // Record the attempt
+  // Record the attempt. tenant_id inherits from the subscription so the
+  // delivery row stays in the same tenant scope.
   const { data: delivery } = await supabase
     .from('webhook_deliveries')
     .insert({
+      tenant_id: subscription.tenant_id,
       subscription_id: subscription.id,
       event_type: eventType,
       case_id: caseId,

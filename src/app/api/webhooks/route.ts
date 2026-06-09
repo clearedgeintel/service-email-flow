@@ -44,9 +44,13 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = getSupabase();
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+
   const { data, error } = await supabase
     .from('webhook_subscriptions')
     .insert({
+      tenant_id: tenantId,
       name: parsed.data.name,
       url: parsed.data.url,
       secret: generateWebhookSecret(),
