@@ -12,6 +12,16 @@ vi.mock('@/lib/logger', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+  createChildLogger: () => ({
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/tenant', () => ({
+  getDefaultTenantId: vi.fn().mockResolvedValue('00000000-0000-0000-0000-00000000d3fa'),
 }));
 
 import { logCaseEvent, getCaseTimeline } from './case-event.service';

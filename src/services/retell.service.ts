@@ -187,9 +187,13 @@ async function createCaseFromCall(call: RetellCallPayload): Promise<number | nul
   // Use a deterministic fake gmail_message_id so we can still dedupe on retry
   const fakeGmailId = `retell:${call.call_id}`;
 
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+
   const { data, error } = await supabase
     .from('email_cases')
     .insert({
+      tenant_id: tenantId,
       gmail_message_id: fakeGmailId,
       from_email: 'voice@cleardesk.internal',
       from_name: customerName || 'Voice caller',
@@ -241,7 +245,13 @@ async function upsertCall(
 ): Promise<void> {
   const supabase = getSupabase();
 
+  // Phase 1 single-tenant: stamp the default tenant on every row. PR2B +
+  // Phase 3 switch to deriving tenant_id from the request's TenantContext.
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+
   const base: Record<string, unknown> = {
+    tenant_id: tenantId,
     retell_call_id: call.call_id,
     case_id: caseId,
     direction: call.direction || 'inbound',

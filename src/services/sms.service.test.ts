@@ -3,6 +3,9 @@ import { createMockSupabase } from '@/test/mocks';
 
 vi.mock('@/lib/supabase', () => ({ getSupabase: vi.fn() }));
 vi.mock('@/lib/config', () => ({ getConfig: vi.fn() }));
+vi.mock('@/lib/tenant', () => ({
+  getDefaultTenantId: vi.fn().mockResolvedValue('00000000-0000-0000-0000-00000000d3fa'),
+}));
 vi.mock('./case-event.service', () => ({ logCaseEvent: vi.fn() }));
 vi.mock('./webhook.service', () => ({ emitWebhookEvent: vi.fn() }));
 vi.mock('@/lib/logger', () => ({

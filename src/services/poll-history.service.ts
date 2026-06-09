@@ -34,9 +34,12 @@ export function startPoll(queueName: string): {
   (async () => {
     try {
       const supabase = getSupabase();
+      const { getDefaultTenantId } = await import('@/lib/tenant');
+      const tenantId = await getDefaultTenantId();
       const { data } = await supabase
         .from('poll_history')
         .insert({
+          tenant_id: tenantId,
           queue_name: queueName,
           started_at: startedAt.toISOString(),
         })
@@ -68,7 +71,10 @@ export function startPoll(queueName: string): {
             .eq('id', pollId);
         } else {
           // Fallback: insert a complete record if the initial insert didn't land
+          const { getDefaultTenantId } = await import('@/lib/tenant');
+          const tenantId = await getDefaultTenantId();
           await supabase.from('poll_history').insert({
+            tenant_id: tenantId,
             queue_name: queueName,
             started_at: startedAt.toISOString(),
             finished_at: finishedAt.toISOString(),

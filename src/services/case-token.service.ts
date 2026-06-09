@@ -41,7 +41,13 @@ export async function getOrCreateCaseToken(caseId: number): Promise<string | nul
     ? new Date(Date.now() + ttl * 24 * 60 * 60 * 1000).toISOString()
     : null;
 
+  // Phase 1 single-tenant: stamp the default tenant. PR2B + Phase 3 derive
+  // from request context.
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+
   const { error } = await supabase.from('case_access_tokens').insert({
+    tenant_id: tenantId,
     token,
     case_id: caseId,
     expires_at: expiresAt,

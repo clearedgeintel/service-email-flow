@@ -18,10 +18,11 @@ export interface FeedbackInput {
 export async function recordFeedback(input: FeedbackInput): Promise<void> {
   const supabase = getSupabase();
 
-  // Get original classification
+  // Get original classification (also pull tenant_id so the feedback row
+  // inherits the same tenant scoping).
   const { data: row, error: fetchError } = await supabase
     .from('email_cases')
-    .select('intent, urgency_level, trade, confidence')
+    .select('intent, urgency_level, trade, confidence, tenant_id')
     .eq('id', input.caseId)
     .single();
 
@@ -33,6 +34,7 @@ export async function recordFeedback(input: FeedbackInput): Promise<void> {
   const { error: insertError } = await supabase
     .from('classification_feedback')
     .insert({
+      tenant_id: (row as { tenant_id: string | null }).tenant_id,
       case_id: input.caseId,
       original_intent: row.intent,
       corrected_intent: input.correctedIntent || row.intent,

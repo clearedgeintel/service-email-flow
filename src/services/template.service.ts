@@ -229,7 +229,14 @@ export async function seedDefaultTemplates(): Promise<{ inserted: number; skippe
     return { inserted: 0, skipped: DEFAULT_TEMPLATES.length };
   }
 
-  const { error } = await supabase.from('email_templates').insert(missing);
+  // Stamp tenant_id on seeded rows so they belong to the default tenant
+  // (Phase 1 single-tenant). PR2B + Phase 3 introduce per-tenant template
+  // seeding via a different code path.
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+  const missingWithTenant = missing.map((t) => ({ ...t, tenant_id: tenantId }));
+
+  const { error } = await supabase.from('email_templates').insert(missingWithTenant);
   if (error) {
     if (isMissingTableError(error)) {
       throw new Error(

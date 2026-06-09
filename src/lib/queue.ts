@@ -19,8 +19,15 @@ export const QUEUE_NAMES = {
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
 // Job data types
+//
+// Multi-tenant note (Phase 1 PR2): tenantId is optional during the
+// transition window. New enqueue sites set it; legacy jobs already in
+// Redis may not have it, so workers fall back to getDefaultTenantId().
+// Once we've drained the queues and all enqueue sites set it (PR2B),
+// this becomes required.
 export interface CaseJobData {
   caseId: number;
+  tenantId?: string;
 }
 
 export interface ErrorAlertJobData {
@@ -35,6 +42,7 @@ export interface WebhookDispatchJobData {
   eventType: string;
   caseId: number | null;
   payload: Record<string, unknown>;
+  tenantId?: string;
 }
 
 const queues = new Map<string, Queue>();

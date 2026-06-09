@@ -84,9 +84,13 @@ async function createCaseFromSms(
   const fakeGmailId = `sms:${from}:${Date.now()}`;
   const truncated = body.substring(0, 500);
 
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const tenantId = await getDefaultTenantId();
+
   const { data, error } = await getSupabase()
     .from('email_cases')
     .insert({
+      tenant_id: tenantId,
       gmail_message_id: fakeGmailId,
       from_email: 'sms@cleardesk.internal',
       from_name: from,
@@ -175,9 +179,15 @@ export async function processInboundSms(params: TwilioInboundParams): Promise<{
     });
   }
 
+  // Phase 1 single-tenant: stamp the default tenant. PR2B + Phase 3 switch
+  // to per-request TenantContext.
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const smsTenantId = await getDefaultTenantId();
+
   const { data: inserted, error } = await supabase
     .from('sms_messages')
     .insert({
+      tenant_id: smsTenantId,
       twilio_sid: sid,
       case_id: caseId,
       direction: 'inbound',
@@ -281,9 +291,16 @@ export async function sendOutboundSms(params: {
   });
 
   const supabase = getSupabase();
+
+  // Phase 1 single-tenant: stamp the default tenant. PR2B + Phase 3 switch
+  // to per-request TenantContext.
+  const { getDefaultTenantId } = await import('@/lib/tenant');
+  const outTenantId = await getDefaultTenantId();
+
   const { data, error } = await supabase
     .from('sms_messages')
     .insert({
+      tenant_id: outTenantId,
       twilio_sid: msg.sid,
       case_id: params.caseId,
       direction: 'outbound',
